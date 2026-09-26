@@ -7,28 +7,820 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Home">
 <title>Home</title>
+<!--
+  Seebo's start page (Code-Homepage). Built piece by piece (register R011-R018).
+  Now at R016: favorites, feeds and settings come from the database (schema
+  `homepage`, locked to his account, R012) after he signs in with Todonut's
+  sign-in; headlines come from `feed_cache` at once, then from the fetcher
+  (Edge Function `homepage-feeds`, acting as him). Every edit saves (R015
+  favorites, R016 feeds); a new feed is checked live by the fetcher first. Published by Code-CB dot com as index.html
+  (R005/R018) -- never from this project.
+-->
 <style>
-:root{--bg:#f6f5f2;--card:#ffffff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e4e2dc;--accent:#2f6f5e}
-@media (prefers-color-scheme: dark){:root{--bg:#141413;--card:#1f1f1d;--ink:#eeede8;--muted:#a3a19a;--line:#33322f;--accent:#7fc4ae}}
+:root{
+  --bg:#f6f5f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e4e2dc;
+  --accent:#2f6f5e; --accent-ink:#ffffff; --soft:#eeece6; --danger:#b3261e;
+  --shadow:0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141413; --card:#1f1f1d; --ink:#eeede8; --muted:#a3a19a; --line:#33322f;
+    --accent:#7fc4ae; --accent-ink:#10231d; --soft:#2a2927; --danger:#f2b8b5;
+    --shadow:none;
+  }
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
-main{max-width:40rem;margin:0 auto;padding:3rem 16px 4rem}
-h1{font-size:2rem;margin:0 0 .25rem;letter-spacing:-.01em}
-.sub{color:var(--muted);margin:0 0 2rem}
-a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.25rem;margin:0 0 .85rem;color:inherit;text-decoration:none}
-a.card:hover,a.card:focus-visible{border-color:var(--accent);outline:none}
-a.card strong{display:block;font-size:1.15rem;color:var(--accent)}
-a.card span{color:var(--muted)}
-footer{color:var(--muted);font-size:.85rem;margin-top:2rem}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:16px 16px 48px}
+a{color:inherit}
+button{font:inherit;color:inherit}
+h2{font-size:.8rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);margin:0}
+
+/* ---- top: quick-launch row + Edit switch ------------------------------ */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.q{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 6px;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  text-decoration:none;font-size:.9rem;box-shadow:var(--shadow);white-space:nowrap}
+.q:hover,.q:focus-visible{border-color:var(--accent);outline:none}
+.q i{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;
+  font:600 .7rem/1 system-ui,sans-serif;font-style:normal;color:#fff;background:var(--c)}
+.edit-toggle{border:1px solid var(--line);background:var(--card);border-radius:999px;
+  padding:5px 14px;cursor:pointer;box-shadow:var(--shadow)}
+.edit-toggle[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.note{color:var(--muted);font-size:.85rem;margin:0 0 18px}
+.edit-only{display:none}
+body.editing .edit-only{display:revert}
+
+/* ---- favorites -------------------------------------------------------- */
+.sec-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 8px}
+.fav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:26px}
+.fav{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:56px;
+  padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);
+  text-decoration:none;box-shadow:var(--shadow);overflow:hidden}
+.fav:hover,.fav:focus-visible{border-color:var(--accent);outline:none}
+.fav b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fav small{color:var(--muted);font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fav.add{align-items:center;border-style:dashed;color:var(--muted);cursor:pointer;background:transparent}
+.fav.add span{font-size:1.4rem;line-height:1}
+.fav .tools{position:absolute;top:4px;right:4px;gap:2px}
+body.editing .fav .tools{display:flex}
+body.editing .fav:not(.add){padding-right:64px}  /* room for the ✎ ✕ so they never cover the name */
+.fav .tools{display:none}
+
+/* ---- feeds ------------------------------------------------------------ */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--card);padding:3px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.small-btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;cursor:pointer}
+.cols{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:14px;align-items:start}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+body.editing .col{min-height:120px;border-radius:12px;outline:1px dashed var(--line);outline-offset:4px}
+.feed{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px 12px;
+  box-shadow:var(--shadow);min-width:0}
+.feed header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.feed header a{font-weight:600;color:var(--accent);text-decoration:none;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed header a:hover{text-decoration:underline}
+.feed ul{list-style:none;margin:0;padding:0}
+.feed li{padding:4px 0;border-top:1px solid var(--line);font-size:.93rem}
+.feed li:first-child{border-top:0}
+.feed li a{text-decoration:none}
+.feed li a:hover{text-decoration:underline}
+.feed li a:visited{color:var(--muted)}
+.feed .feed-status{color:var(--muted);font-size:.82rem;font-style:italic}
+.feed-state{color:var(--muted);font-size:.82rem}
+.feed-state.err{color:var(--danger)}
+.feed .tools{display:none;align-items:center;gap:4px}
+body.editing .feed .tools{display:flex}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stepper button{border:0;background:var(--soft);width:26px;height:24px;cursor:pointer;line-height:1}
+.stepper output{min-width:26px;text-align:center;font-size:.85rem}
+.icon-btn{border:0;background:var(--soft);border-radius:6px;width:24px;height:24px;cursor:pointer;
+  line-height:1;font-size:.8rem;padding:0}
+.icon-btn.del:hover{color:var(--danger)}
+.hint{color:var(--muted);font-size:.85rem;margin:8px 0 0}
+
+/* ---- dragging (edit mode only) ---------------------------------------- */
+body.editing [data-drag]{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.dragging{opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:grabbing!important}
+.ph{border:2px dashed var(--accent);border-radius:12px;background:transparent}
+
+/* ---- dialog ----------------------------------------------------------- */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);
+  padding:18px;width:min(420px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog h3{margin:0 0 12px;font-size:1.05rem}
+dialog label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+dialog input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);color:var(--ink);font:inherit}
+dialog .row{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+dialog .row button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 14px;cursor:pointer}
+dialog .row button[value="ok"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+dialog .fine{font-size:.8rem;color:var(--muted);margin:10px 0 0}
+dialog .opt{font-size:.78rem}
+
+/* ---- favorite colours (R017) -------------------------------------------
+   A tint behind the button and a coloured edge. Text contrast measured
+   2026-09-26 against the standard 4.5:1: worst 4.59 (the small address text
+   on purple, light mode); names 11.6 or better. Re-measure if a tint changes. */
+.fav[data-color]{background:var(--fbg);box-shadow:inset 4px 0 0 var(--fedge),var(--shadow)}
+.fav[data-color="red"],.swatch[data-color="red"]{--fbg:#fde8e7;--fedge:#c5221f}
+.fav[data-color="orange"],.swatch[data-color="orange"]{--fbg:#fdeee2;--fedge:#d35f0b}
+.fav[data-color="amber"],.swatch[data-color="amber"]{--fbg:#fdf5d8;--fedge:#b58100}
+.fav[data-color="green"],.swatch[data-color="green"]{--fbg:#e6f4ea;--fedge:#188038}
+.fav[data-color="teal"],.swatch[data-color="teal"]{--fbg:#e0f3f1;--fedge:#0f7b73}
+.fav[data-color="blue"],.swatch[data-color="blue"]{--fbg:#e8f0fe;--fedge:#1a73e8}
+.fav[data-color="purple"],.swatch[data-color="purple"]{--fbg:#f1e9fb;--fedge:#7b3fc4}
+.fav[data-color="pink"],.swatch[data-color="pink"]{--fbg:#fce8f2;--fedge:#c2185b}
+@media (prefers-color-scheme: dark){
+  .fav[data-color="red"],.swatch[data-color="red"]{--fbg:#3a1d1c;--fedge:#f28b82}
+  .fav[data-color="orange"],.swatch[data-color="orange"]{--fbg:#3b2616;--fedge:#f6ad6f}
+  .fav[data-color="amber"],.swatch[data-color="amber"]{--fbg:#362d12;--fedge:#f2cc5c}
+  .fav[data-color="green"],.swatch[data-color="green"]{--fbg:#1b3322;--fedge:#81c995}
+  .fav[data-color="teal"],.swatch[data-color="teal"]{--fbg:#16322f;--fedge:#72cdc2}
+  .fav[data-color="blue"],.swatch[data-color="blue"]{--fbg:#1b2a40;--fedge:#8ab4f8}
+  .fav[data-color="purple"],.swatch[data-color="purple"]{--fbg:#2d2240;--fedge:#c3a4f2}
+  .fav[data-color="pink"],.swatch[data-color="pink"]{--fbg:#3a1b2a;--fedge:#f48fb1}
+}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.swatch{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;
+  background:var(--fedge,var(--card))}
+.swatch[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:2px}
+.swatch.none{background:linear-gradient(135deg,transparent 45%,var(--muted) 45%,var(--muted) 55%,transparent 55%),var(--card)}
+
+/* ---- sign-in, messages, footer ---------------------------------------- */
+[hidden]{display:none!important}
+.gate{max-width:360px;margin:24px 0}
+.gate form{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.gate input{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+.gate button{padding:9px 14px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);
+  color:var(--accent-ink);cursor:pointer;font-weight:600}
+.gate button:disabled{opacity:.6;cursor:default}
+.gmsg{min-height:1.2em;font-size:.9rem;color:var(--muted);margin:8px 0 0}
+.gmsg.err,.note.err{color:var(--danger)}
+.foot{margin-top:32px;text-align:right}
+.linkish{border:0;background:none;color:var(--muted);font-size:.85rem;cursor:pointer;text-decoration:underline;padding:0}
 </style>
 </head>
 <body>
 <main>
-<h1>Home</h1>
-<p class="sub">Personal apps. Each one asks you to sign in.</p>
-<a class="card" href="todonut.html"><strong>Todonut</strong><span>To-do lists: lists, items, done.</span></a>
-<a class="card" href="register.html"><strong>Build register</strong><span>What is outstanding, and in what order, for every project.</span></a>
-<footer>homepage.chipbowman.com</footer>
+  <header class="top">
+    <nav class="quick" aria-label="Quick launch" id="quick"></nav>
+    <button class="edit-toggle" id="editBtn" aria-pressed="false" hidden>Edit</button>
+  </header>
+  <p class="note edit-only" id="buildNote">Changes save as you make them. Quick-launch buttons are added by
+    asking Claude.</p>
+
+  <!-- Signed out: only the quick-launch row above and this. The sign-in is
+       Todonut's (same project, same saved session `todonut-auth`, R003). -->
+  <section class="gate" id="gate" hidden aria-labelledby="gateH">
+    <h2 id="gateH">Sign in</h2>
+    <p class="note">Your favorites and feeds appear once you're signed in — the same sign-in as Todonut.</p>
+    <form id="gateForm" autocomplete="on">
+      <input type="email" id="gEmail" placeholder="email" autocomplete="username" required>
+      <input type="password" id="gPass" placeholder="password" autocomplete="current-password" required>
+      <button id="gGo">Sign in</button>
+    </form>
+    <p class="gmsg" id="gMsg" role="status"></p>
+  </section>
+
+  <p class="note" id="loadMsg" role="status" hidden></p>
+
+  <div id="mine" hidden>
+  <section aria-labelledby="favH">
+    <div class="sec-head"><h2 id="favH">Favorites</h2><span class="feed-state" id="favStatus" role="status"></span></div>
+    <div class="fav-grid" id="favGrid" data-zone="fav"></div>
+  </section>
+
+  <section aria-labelledby="feedH">
+    <div class="sec-head">
+      <h2 id="feedH">Feeds</h2>
+      <span class="feed-state" id="feedStatus" role="status"></span>
+      <span class="edit-only">
+        <span class="seg" role="group" aria-label="Columns">
+          <button data-action="cols" data-n="2">2 columns</button><button data-action="cols" data-n="3">3 columns</button>
+        </span>
+        <button class="small-btn" data-action="add-feed">+ Add feed</button>
+      </span>
+    </div>
+    <div class="cols" id="cols"></div>
+    <p class="hint edit-only" id="narrowHint" hidden>This screen shows fewer columns than your setting, so feeds are
+      rearranged on a wider screen.</p>
+    <p class="note" id="emptyMsg" hidden>Signed in, but this account has no favorites or feeds.</p>
+  </section>
+  <footer class="foot"><button class="linkish" id="signOut">Sign out (Todonut too)</button></footer>
+  </div>
 </main>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlgForm">
+    <h3 id="dlgTitle"></h3>
+    <label for="fName">Name</label>
+    <input id="fName" autocomplete="off" maxlength="200">
+    <div id="shortRow">
+      <label for="fShort">Short name <span class="opt">(optional — shown on the button)</span></label>
+      <input id="fShort" autocomplete="off" maxlength="40">
+    </div>
+    <div id="colorRow">
+      <label id="colorLbl">Colour</label>
+      <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
+    </div>
+    <label for="fUrl">Address</label>
+    <input id="fUrl" inputmode="url" autocomplete="off" placeholder="https://…">
+    <p class="fine" id="dlgFine"></p>
+    <div class="row"><button type="button" id="dlgCancel">Cancel</button><button value="ok">Save</button></div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+// Quick-launch: written into the page on purpose (R007 a) -- always visible,
+// signed in or not; a new one is added by asking Claude, then republished.
+var QUICK = [
+  {t:"Gmail",    u:"https://mail.google.com/mail/", c:"#c5221f"},
+  {t:"Calendar", u:"https://calendar.google.com/",  c:"#1a73e8"},
+  {t:"Maps",     u:"https://www.google.com/maps",   c:"#188038"},
+  {t:"Drive",    u:"https://drive.google.com/",     c:"#e37400"},
+  {t:"Todonut",  u:"todonut.html",                  c:"#2f6f5e"},
+  {t:"Register", u:"register.html",                 c:"#5f6368"}
+];
+
+// The database (R013): schema `homepage` in ClaudeSeebo's Project, readable
+// and writable only by Seebo's account (R012). The key is the project's
+// PUBLISHABLE key -- public by design, the same one Todonut's page carries;
+// inserted from that page by script, never typed.
+var SUPABASE_URL = "https://sgjhnwrornugobzpqzii.supabase.co";
+var SUPABASE_KEY = "sb_publishable_xmew25JUZnTip4LWtZ9ULg_x8Go9bXY";
+var sb = null, userId = null;
+
+// Filled from the database once signed in; empty until then.
+var state = {columns: 2, favorites: [], feeds: []};
+var editing = false;
+var MIN_COUNT = 1, MAX_COUNT = 20;
+
+// Stored headlines, by feed id: {items, fetched_at, checked_at, last_error, ...}
+// Read from `feed_cache` at once, then refreshed by the fetcher (R014).
+var cache = {};
+var refreshing = false;
+
+function when(iso){
+  if (!iso) return "";
+  var d = new Date(iso), now = new Date();
+  var t = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  return d.toDateString() === now.toDateString() ? t : d.toLocaleDateString([], {month: "short", day: "numeric"}) + " " + t;
+}
+
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+function host(u){ try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; } }
+function byId(list, id){ id = +id; return list.find(function(x){ return x.id === id; }); }
+
+// Ruled R007 f: one setting (2 or 3); narrow screens drop columns -- iPad
+// upright 2, phone 1 -- stacked in column order.
+function visibleCols(){
+  var w = window.innerWidth;
+  var max = w < 640 ? 1 : (w < 1024 ? 2 : 3);
+  return Math.min(state.columns, max);
+}
+
+// ---------------------------------------------------------------- render
+function renderQuick(){
+  $("quick").innerHTML = QUICK.map(function(q){
+    return '<a class="q" href="' + esc(q.u) + '" style="--c:' + q.c + '"><i aria-hidden="true">' +
+      esc(q.t[0]) + '</i>' + esc(q.t) + '</a>';
+  }).join("");
+}
+
+function renderFavs(){
+  var html = '<button class="fav add" data-action="add-fav" aria-label="Add favorite"><span>+</span>' +
+             '<small>Add favorite</small></button>';
+  html += state.favorites.map(function(f){
+    // The short name, if set, is what the button shows; the full name on hover (R015).
+    var colour = COLORS.indexOf(f.color) >= 0 ? ' data-color="' + f.color + '"' : '';   // R017
+    return '<a class="fav"' + colour + ' data-drag="fav" data-id="' + f.id + '" href="' + esc(f.url) + '" title="' + esc(f.title) + '">' +
+      '<b>' + esc(f.short || f.title) + '</b><small>' + esc(host(f.url)) + '</small>' +
+      '<span class="tools">' +
+        '<button class="icon-btn" data-action="edit-fav" data-id="' + f.id + '" aria-label="Edit ' + esc(f.title) + '">✎</button>' +
+        '<button class="icon-btn del" data-action="del-fav" data-id="' + f.id + '" aria-label="Delete ' + esc(f.title) + '">✕</button>' +
+      '</span></a>';
+  }).join("");
+  $("favGrid").innerHTML = html;
+}
+
+function renderFeeds(){
+  var vis = visibleCols();
+  var canDrag = vis === state.columns;
+  var cols = $("cols");
+  cols.style.setProperty("--n", vis);
+  var buckets = [];
+  for (var i = 0; i < vis; i++) buckets.push([]);
+  state.feeds.slice().sort(function(a, b){ return a.col - b.col || a.pos - b.pos; })
+    .forEach(function(f){ buckets[Math.min(f.col, vis - 1)].push(f); });
+  cols.innerHTML = buckets.map(function(list, ci){
+    return '<div class="col" data-zone="feed" data-col="' + ci + '">' + list.map(function(f){
+      var c = cache[f.id], items = c && c.items ? c.items : [], lines = "";
+      items.slice(0, f.count).forEach(function(it){
+        lines += '<li><a href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer">' + esc(it.title) + '</a></li>';
+      });
+      // Say what is true: never read, read but failing (copy kept), or empty.
+      var status = "";
+      if (!c) status = refreshing ? "Reading…" : "Not read yet.";
+      else if (c.last_error && items.length) status = "Couldn't read at " + when(c.last_error_at) + " — showing the copy from " + when(c.fetched_at) + ".";
+      else if (c.last_error) status = "Couldn't read: " + c.last_error;
+      else if (!items.length) status = "No headlines in this feed right now.";
+      if (status) lines += '<li class="feed-status">' + esc(status) + '</li>';
+      return '<article class="feed"' + (canDrag ? ' data-drag="feed"' : '') + ' data-id="' + f.id + '">' +
+        '<header><a href="' + esc(f.site) + '">' + esc(f.title) + '</a>' +
+        '<span class="tools">' +
+          '<span class="stepper" aria-label="Headlines shown">' +
+            '<button data-action="dec" data-id="' + f.id + '" aria-label="Fewer headlines">−</button>' +
+            '<output>' + f.count + '</output>' +
+            '<button data-action="inc" data-id="' + f.id + '" aria-label="More headlines">+</button>' +
+          '</span>' +
+          '<button class="icon-btn del" data-action="del-feed" data-id="' + f.id + '" aria-label="Delete ' + esc(f.title) + '">✕</button>' +
+        '</span></header><ul>' + lines + '</ul></article>';
+    }).join("") + '</div>';
+  }).join("");
+  $("narrowHint").hidden = canDrag;
+  document.querySelectorAll('[data-action="cols"]').forEach(function(b){
+    b.setAttribute("aria-pressed", String(+b.dataset.n === state.columns));
+  });
+}
+
+function render(){ renderFavs(); renderFeeds(); }
+
+// ---------------------------------------------------------------- edit switch
+$("editBtn").addEventListener("click", function(){
+  editing = !editing;
+  document.body.classList.toggle("editing", editing);
+  this.setAttribute("aria-pressed", String(editing));
+  this.textContent = editing ? "Done" : "Edit";
+});
+
+// ---------------------------------------------------------------- dialog
+var dlgSave = null, dlgColor = null;
+// The small set (R007 c); null = none. Names, not colour codes, are stored,
+// so a tint can be retuned for light and dark without touching data.
+var COLORS = ["red", "orange", "amber", "green", "teal", "blue", "purple", "pink"];
+function renderSwatches(){
+  $("swatches").innerHTML = [null].concat(COLORS).map(function(c){
+    return '<button type="button" class="swatch' + (c ? '' : ' none') + '"' + (c ? ' data-color="' + c + '"' : '') +
+      ' data-pick="' + (c || "") + '" aria-pressed="' + String(c === dlgColor) + '" aria-label="' + (c || "no colour") + '"></button>';
+  }).join("");
+}
+$("swatches").addEventListener("click", function(e){
+  var b = e.target.closest("[data-pick]");
+  if (!b) return;
+  dlgColor = b.dataset.pick || null;
+  renderSwatches();
+});
+// v: {name, url, short, color}; isFav shows the short-name and colour fields.
+function openDialog(title, v, fine, onSave, isFav){
+  $("dlgTitle").textContent = title;
+  $("fName").value = v.name || "";
+  $("fShort").value = v.short || "";
+  $("fUrl").value = v.url || "";
+  $("shortRow").hidden = !isFav;
+  $("colorRow").hidden = !isFav;
+  dlgColor = COLORS.indexOf(v.color) >= 0 ? v.color : null;
+  renderSwatches();
+  $("dlgFine").textContent = fine || "";
+  dlgSave = onSave;
+  $("dlg").showModal();
+  $("fName").focus();
+}
+function normalUrl(u){
+  u = u.trim();
+  if (!u) return null;
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  try { var p = new URL(u); return /^https?:$/.test(p.protocol) ? p.href : null; } catch (e) { return null; }
+}
+// Cancel is type="button" so that Enter in a field saves rather than cancels.
+$("dlgCancel").addEventListener("click", function(){ $("dlg").close("cancel"); });
+$("dlg").addEventListener("close", function(){
+  if ($("dlg").returnValue !== "ok" || !dlgSave) return;
+  var url = normalUrl($("fUrl").value);
+  if (!url) { alert("That address doesn't look like a web address."); return; }
+  // The name as typed, possibly empty: favorites fall back to the address's
+  // host, a new feed to the feed's own title.
+  dlgSave($("fName").value.trim(), url, $("fShort").value.trim() || null, dlgColor);
+});
+
+// ---------------------------------------------------------------- saving favorites (R015)
+// Every change is written to the database as it happens. supabase-js reports
+// failures in `error` rather than throwing, and a rule that refuses an update
+// or delete answers with ZERO rows rather than an error -- so both are checked.
+// On any failure the page says so and reloads what is actually saved.
+var FAV_COLS = "id,title,short_name,url,color,position";
+function favFromRow(r){
+  return {id: r.id, title: r.title, short: r.short_name, url: r.url, color: r.color, position: r.position};
+}
+function check(r){ if (r.error) throw r.error; return r; }
+function oneRow(r){ check(r); if (!r.data || !r.data.length) throw new Error("nothing was saved"); return r; }
+function reloadFavs(){
+  return sb.from("favorites").select(FAV_COLS).order("position").then(check).then(function(r){
+    state.favorites = r.data.map(favFromRow); renderFavs();
+  });
+}
+function favSaved(){
+  var s = $("favStatus"); s.className = "feed-state"; s.textContent = "Saved";
+  setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
+}
+function favFailed(err){
+  var s = $("favStatus"); s.className = "feed-state err";
+  s.textContent = "Couldn't save: " + (err && err.message ? err.message : err) + " — showing what is saved.";
+  reloadFavs().catch(function(){});
+}
+// ---------------------------------------------------------------- saving feeds (R016)
+// Same discipline as favorites: error AND zero rows are failures; on failure
+// say so and reload what is saved. `_col`/`_pos` remember the saved place, so
+// only feeds that actually moved are written.
+var FEED_COLS = "id,title,url,site_url,col,position,headline_count";
+var STALE_DAYS = 30;                          // tools/check_feeds.py's rule
+function feedFromRow(f){
+  return {id: f.id, title: f.title, url: f.url, site: f.site_url || f.url,
+          col: f.col, pos: f.position, count: f.headline_count, _col: f.col, _pos: f.position};
+}
+function feedSaved(){
+  var s = $("feedStatus"); s.className = "feed-state"; s.textContent = "Saved";
+  setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
+}
+function reloadFeeds(){
+  return Promise.all([
+    sb.from("feeds").select(FEED_COLS).order("col").order("position"),
+    sb.from("settings").select("columns").maybeSingle()
+  ]).then(function(r){
+    check(r[0]); check(r[1]);
+    state.feeds = r[0].data.map(feedFromRow);
+    state.columns = r[1].data ? r[1].data.columns : 2;
+    renderFeeds();
+  });
+}
+function feedFailed(err){
+  var s = $("feedStatus"); s.className = "feed-state err";
+  s.textContent = "Couldn't save: " + (err && err.message ? err.message : err) + " — showing what is saved.";
+  reloadFeeds().catch(function(){});
+}
+function saveFeedOrder(){
+  var moved = state.feeds.filter(function(f){ return f.col !== f._col || f.pos !== f._pos; });
+  return Promise.all(moved.map(function(f){
+    return sb.from("feeds").update({col: f.col, position: f.pos}).eq("id", f.id).select("id").then(oneRow)
+      .then(function(){ f._col = f.col; f._pos = f.pos; });
+  }));
+}
+var countTimers = {};
+function saveCount(f){                        // one write after the clicking stops
+  clearTimeout(countTimers[f.id]);
+  countTimers[f.id] = setTimeout(function(){
+    sb.from("feeds").update({headline_count: f.count}).eq("id", f.id).select("id")
+      .then(oneRow).then(feedSaved).catch(feedFailed);
+  }, 600);
+}
+
+// Add: the fetcher reads the address first (check mode — it writes nothing),
+// Seebo sees what it found, and only a yes saves. (R007 e2)
+function addFeed(name, address){
+  var s = $("feedStatus");
+  s.className = "feed-state"; s.textContent = "Checking " + host(address) + "…";
+  sb.functions.invoke("homepage-feeds", {body: {check: address}}).then(function(r){
+    if (r.error) throw r.error;
+    var found = r.data;
+    if (!found || !found.ok) throw new Error(found && found.error ? found.error : "no answer");
+    var msg = 'Found "' + found.title + '": ' + found.count + " headline" + (found.count === 1 ? "" : "s");
+    if (found.newest) msg += ", newest " + when(found.newest);
+    msg += ".";
+    var ageDays = found.newest ? (Date.now() - Date.parse(found.newest)) / 864e5 : null;
+    if (!found.count) msg += "\n\nIt has no headlines right now.";
+    else if (ageDays !== null && ageDays > STALE_DAYS)
+      msg += "\n\n⚠ Its newest headline is " + Math.round(ageDays) + " days old — it looks frozen, as four of igHome's were.";
+    s.textContent = "";
+    if (!confirm(msg + "\n\nAdd it?")) return;
+    var pos = state.feeds.reduce(function(m, x){ return x.col === 0 ? Math.max(m, x.pos + 1) : m; }, 0);
+    return sb.from("feeds").insert({title: (name || found.title).slice(0, 200), url: found.feed_url,
+        site_url: found.site_url || null, col: 0, position: pos, headline_count: 6})
+      .select(FEED_COLS).then(oneRow).then(function(ins){
+        state.feeds.push(feedFromRow(ins.data[0]));
+        renderFeeds(); feedSaved();
+        refresh();                            // read it now: it has no stored copy yet
+      });
+  }).catch(function(err){
+    s.className = "feed-state err";
+    s.textContent = "Couldn't add: " + (err && err.message ? err.message : err);
+  });
+}
+
+function saveFavOrder(){
+  var changed = [];
+  state.favorites.forEach(function(f, i){ if (f.position !== i) { f.position = i; changed.push(f); } });
+  if (!changed.length) return;
+  Promise.all(changed.map(function(f){
+    return sb.from("favorites").update({position: f.position}).eq("id", f.id).select("id").then(oneRow);
+  })).then(favSaved).catch(favFailed);
+}
+
+// ---------------------------------------------------------------- actions
+var lastDrag = 0;
+document.addEventListener("click", function(e){
+  if (Date.now() - lastDrag < 350) { e.preventDefault(); e.stopPropagation(); return; }
+  var b = e.target.closest("[data-action]");
+  if (!b) {
+    // In edit mode a favorite or feed title is something to arrange, not to follow.
+    if (editing && e.target.closest(".fav, .feed a")) e.preventDefault();
+    return;
+  }
+  e.preventDefault();
+  var id = b.dataset.id, f;
+  switch (b.dataset.action) {
+    case "add-fav":
+      openDialog("Add favorite", {}, "", function(t, u, s, c){
+        // New favorites go at the end (ruled with R015's go).
+        var pos = state.favorites.reduce(function(m, x){ return Math.max(m, x.position + 1); }, 0);
+        sb.from("favorites").insert({title: t || host(u), short_name: s, url: u, color: c, position: pos}).select(FAV_COLS)
+          .then(oneRow).then(function(r){ state.favorites.push(favFromRow(r.data[0])); renderFavs(); favSaved(); })
+          .catch(favFailed);
+      }, true);
+      break;
+    case "edit-fav":
+      f = byId(state.favorites, id);
+      openDialog("Edit favorite", {name: f.title, url: f.url, short: f.short, color: f.color}, "", function(t, u, s, c){
+        sb.from("favorites").update({title: t || host(u), short_name: s, url: u, color: c}).eq("id", f.id).select(FAV_COLS)
+          .then(oneRow).then(function(r){ Object.assign(f, favFromRow(r.data[0])); renderFavs(); favSaved(); })
+          .catch(favFailed);
+      }, true);
+      break;
+    case "del-fav":
+      f = byId(state.favorites, id);
+      if (confirm('Delete the favorite "' + f.title + '"?')) {
+        sb.from("favorites").delete().eq("id", f.id).select("id")
+          .then(oneRow).then(function(){
+            state.favorites = state.favorites.filter(function(x){ return x !== f; }); renderFavs(); favSaved();
+          }).catch(favFailed);
+      }
+      break;
+    case "dec": case "inc":
+      f = byId(state.feeds, id);
+      f.count = Math.max(MIN_COUNT, Math.min(MAX_COUNT, f.count + (b.dataset.action === "inc" ? 1 : -1)));
+      renderFeeds();
+      saveCount(f);
+      break;
+    case "del-feed":
+      f = byId(state.feeds, id);
+      if (confirm('Delete the feed "' + f.title + '"?')) {
+        sb.from("feeds").delete().eq("id", f.id).select("id").then(oneRow).then(function(){
+          state.feeds = state.feeds.filter(function(x){ return x !== f; });
+          delete cache[f.id];                 // its stored headlines went with it (on delete cascade)
+          renderFeeds(); feedSaved();
+        }).catch(feedFailed);
+      }
+      break;
+    case "cols":
+      var n = +b.dataset.n;
+      if (n === state.columns) break;
+      state.columns = n;
+      // Going from 3 to 2: the third column's feeds join the end of the second.
+      var last = n - 1, maxPos = 0;
+      state.feeds.forEach(function(x){ if (x.col === last) maxPos = Math.max(maxPos, x.pos + 1); });
+      state.feeds.forEach(function(x){ if (x.col > last) { x.col = last; x.pos = maxPos++; } });
+      renderFeeds();
+      sb.from("settings").upsert({id: true, columns: n}).select("id").then(oneRow)
+        .then(saveFeedOrder).then(feedSaved).catch(feedFailed);
+      break;
+    case "add-feed":
+      openDialog("Add feed", {}, "Paste a feed's address, or just the site's. It is checked live before " +
+        "anything is saved. Leave the name empty to use the feed's own.", function(name, u){ addFeed(name, u); }, false);
+      break;
+  }
+}, true);
+
+// ---------------------------------------------------------------- dragging
+// Pointer events rather than HTML5 drag-and-drop, so mouse and touch (iPad)
+// behave the same (R007 d). Only in edit mode; only after a 6px move, so a
+// tap on a button inside an item still works.
+var drag = null;
+document.addEventListener("pointerdown", function(e){
+  if (!editing || (e.pointerType === "mouse" && e.button !== 0)) return;
+  var el = e.target.closest("[data-drag]");
+  if (!el || e.target.closest("button, input")) return;
+  var r = el.getBoundingClientRect();
+  drag = {el: el, kind: el.dataset.drag, x0: e.clientX, y0: e.clientY,
+          dx: e.clientX - r.left, dy: e.clientY - r.top, pid: e.pointerId, active: false, ph: null};
+});
+window.addEventListener("pointermove", function(e){
+  if (!drag || e.pointerId !== drag.pid) return;
+  if (!drag.active) {
+    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+    startDrag();
+  }
+  e.preventDefault();
+  moveDrag(e.clientX, e.clientY);
+}, {passive: false});
+// A favorite IS a link, and a feed's title is one: with a mouse, the browser's
+// own link-dragging starts on them and cancels ours (pointercancel). Found in
+// R011 by a real mouse drag that moved nothing while a scripted one worked.
+document.addEventListener("dragstart", function(e){ if (editing) e.preventDefault(); });
+window.addEventListener("pointerup", function(){ finishDrag(true); });
+window.addEventListener("pointercancel", function(){ finishDrag(false); });
+
+function startDrag(){
+  var el = drag.el, r = el.getBoundingClientRect();
+  var ph = document.createElement("div");
+  ph.className = "ph";
+  ph.style.height = r.height + "px";
+  el.parentNode.insertBefore(ph, el);
+  el.classList.add("dragging");
+  Object.assign(el.style, {position: "fixed", left: r.left + "px", top: r.top + "px",
+    width: r.width + "px", height: r.height + "px", zIndex: 1000, pointerEvents: "none", margin: 0});
+  drag.ph = ph; drag.active = true;
+}
+
+function moveDrag(x, y){
+  drag.el.style.left = (x - drag.dx) + "px";
+  drag.el.style.top = (y - drag.dy) + "px";
+  if (y < 48) window.scrollBy(0, -14); else if (y > window.innerHeight - 48) window.scrollBy(0, 14);
+  var under = document.elementFromPoint(x, y);
+  var zone = under && under.closest('[data-zone="' + drag.kind + '"]');
+  if (!zone) return;
+  var items = Array.prototype.filter.call(zone.children, function(n){
+    return n !== drag.el && n.hasAttribute("data-drag");
+  });
+  var before = items.find(function(n){
+    var b = n.getBoundingClientRect();
+    return drag.kind === "feed"
+      ? y < b.top + b.height / 2                                    // a vertical list
+      : y < b.top || (y <= b.bottom && x < b.left + b.width / 2);  // a wrapping grid, reading order
+  }) || null;
+  if (before) zone.insertBefore(drag.ph, before); else zone.appendChild(drag.ph);
+}
+
+function finishDrag(commit){
+  if (!drag) return;
+  var d = drag; drag = null;
+  if (!d.active) return;
+  d.ph.replaceWith(d.el);
+  d.el.removeAttribute("style");
+  d.el.classList.remove("dragging");
+  lastDrag = Date.now();
+  if (commit) {
+    syncOrder(d.kind);
+    if (d.kind === "fav") saveFavOrder();                                  // R015
+    else saveFeedOrder().then(function(){ feedSaved(); }).catch(feedFailed); // R016
+  }
+  render();
+}
+
+// The DOM order after a drop is the new order; copy it back into the state.
+function syncOrder(kind){
+  if (kind === "fav") {
+    var ids = Array.prototype.map.call(document.querySelectorAll('#favGrid [data-drag="fav"]'),
+      function(n){ return +n.dataset.id; });
+    state.favorites.sort(function(a, b){ return ids.indexOf(a.id) - ids.indexOf(b.id); });
+  } else {
+    document.querySelectorAll('#cols [data-zone="feed"]').forEach(function(zone){
+      var col = +zone.dataset.col;
+      Array.prototype.forEach.call(zone.querySelectorAll('[data-drag="feed"]'), function(n, pos){
+        var f = byId(state.feeds, n.dataset.id); f.col = col; f.pos = pos;
+      });
+    });
+  }
+}
+
+var lastVis = 0;
+window.addEventListener("resize", function(){
+  if (drag) return;
+  var v = visibleCols();
+  if (v !== lastVis) { lastVis = v; renderFeeds(); }
+});
+
+// ---------------------------------------------------------------- signed in / out
+function showSignedOut(){
+  userId = null;
+  state = {columns: 2, favorites: [], feeds: []};
+  cache = {};
+  $("feedStatus").textContent = "";
+  if (editing) $("editBtn").click();
+  $("editBtn").hidden = true;
+  $("mine").hidden = true;
+  $("loadMsg").hidden = true;
+  $("buildNote").hidden = true;
+  $("gate").hidden = false;
+}
+
+function showSignedIn(session){
+  if (userId === session.user.id) return;          // a token refresh, not a new sign-in
+  userId = session.user.id;
+  $("gate").hidden = true;
+  $("gPass").value = "";
+  load();
+}
+
+function load(){
+  var msg = $("loadMsg");
+  msg.className = "note"; msg.textContent = "Loading your page…"; msg.hidden = false;
+  Promise.all([
+    sb.from("favorites").select(FAV_COLS).order("position"),
+    sb.from("feeds").select("id,title,url,site_url,col,position,headline_count").order("col").order("position"),
+    sb.from("settings").select("columns").maybeSingle(),
+    sb.from("feed_cache").select("feed_id,items,fetched_at,checked_at,last_error,last_error_at")
+  ]).then(function(r){
+    var err = r[0].error || r[1].error || r[2].error || r[3].error;
+    if (err) throw err;
+    cache = {};
+    r[3].data.forEach(function(row){ cache[row.feed_id] = row; });
+    state.favorites = r[0].data.map(favFromRow);
+    state.feeds = r[1].data.map(feedFromRow);
+    state.columns = r[2].data ? r[2].data.columns : 2;
+    msg.hidden = true;
+    // An empty answer is not a failed one (R17): say which it is.
+    $("emptyMsg").hidden = state.favorites.length + state.feeds.length > 0;
+    $("buildNote").hidden = false;
+    $("editBtn").hidden = false;
+    $("mine").hidden = false;
+    render();
+    lastVis = visibleCols();
+    refresh();
+  }).catch(function(e){
+    msg.className = "note err";
+    msg.textContent = "Could not load your page: " + (e && e.message ? e.message : e);
+  });
+}
+
+// Stored copies are already on screen; now ask the fetcher to re-read any feed
+// older than 10 minutes (R007 h) and redraw with what it returns.
+function refresh(){
+  if (!state.feeds.length) return;
+  var st = $("feedStatus");
+  refreshing = true; st.textContent = "Refreshing…"; st.className = "feed-state";
+  sb.functions.invoke("homepage-feeds", {body: {}}).then(function(r){
+    refreshing = false;
+    if (r.error) throw r.error;
+    cache = {};
+    (r.data.cache || []).forEach(function(row){ cache[row.feed_id] = row; });
+    var failed = (r.data.refreshed || []).filter(function(x){ return !x.ok; }).length;
+    st.textContent = failed ? failed + " feed" + (failed > 1 ? "s" : "") + " couldn't be read just now" : "";
+    renderFeeds();
+  }).catch(function(e){
+    refreshing = false;
+    st.className = "feed-state err";
+    st.textContent = "Couldn't refresh: " + (e && e.message ? e.message : e) + " — showing stored copies.";
+    renderFeeds();
+  });
+}
+
+$("gateForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  var go = $("gGo"), m = $("gMsg");
+  go.disabled = true; m.className = "gmsg"; m.textContent = "Signing in…";
+  sb.auth.signInWithPassword({email: $("gEmail").value.trim(), password: $("gPass").value})
+    .then(function(r){
+      go.disabled = false;
+      if (r.error) throw r.error;
+      m.textContent = "";
+    })
+    .catch(function(err){
+      go.disabled = false;
+      m.className = "gmsg err";
+      m.textContent = "Could not sign in: " + (err && err.message ? err.message : err);
+    });
+});
+
+// scope "local": THIS browser only. supabase-js's default ("global") ends the
+// account's sessions on every device -- the iPad's Todonut too -- which is more
+// than R003 ruled (one sign-in on this site). Found 2026-09-26 before the
+// first sign-out test, which would otherwise have signed out every device.
+$("signOut").addEventListener("click", function(){
+  if (!confirm("Sign out on this browser? Todonut on this site signs out too — it is one sign-in. Other devices stay signed in.")) return;
+  sb.auth.signOut({scope: "local"});
+});
+
+function boot(){
+  renderQuick();                                    // always there, signed in or not (R007 a)
+  if (!window.supabase || !window.supabase.createClient) {
+    var msg = $("loadMsg");
+    msg.className = "note err"; msg.hidden = false;
+    msg.textContent = "The sign-in library did not load, so your favorites and feeds cannot be shown. " +
+                      "The quick-launch buttons above still work.";
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    db: {schema: "homepage"},
+    auth: {persistSession: true, autoRefreshToken: true, storageKey: "todonut-auth"}   // Todonut's (R003)
+  });
+  // supabase-js advises against calling it from inside this callback, so the
+  // work is handed to the next tick.
+  sb.auth.onAuthStateChange(function(event, session){
+    setTimeout(function(){
+      if (session && session.user) showSignedIn(session); else showSignedOut();
+    }, 0);
+  });
+}
+boot();
+</script>
 </body>
 </html>
