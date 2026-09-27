@@ -42,7 +42,7 @@
                  border-radius:9px;padding:6px 11px;cursor:pointer;}
 
   .newcat{display:flex;gap:8px;margin:14px 0 4px;}
-  input[type=text],input[type=email],textarea{
+  input[type=text],input[type=email],input[type=password],textarea{
     font:inherit;font-size:16px;padding:11px 13px;border:1px solid var(--line);
     border-radius:11px;background:var(--card);color:var(--ink);width:100%;
     outline:none;transition:border-color .15s,box-shadow .15s;min-width:0;}
@@ -194,7 +194,6 @@
   .gatecard>p{font-size:14px;color:var(--muted);text-align:center;margin:0 0 18px;line-height:1.5;}
   .gatecard input{margin-bottom:9px;}
   .gswap{font-size:14px;text-align:center;margin:14px 0 0!important;}
-  .gswap a{color:var(--accent);font-weight:600;text-decoration:none;}
   .gfoot{font-size:12.5px!important;color:#a2968a!important;margin:14px 0 0!important;
          line-height:1.45;text-align:center;}
   body.locked{overflow:hidden;}
@@ -266,13 +265,9 @@
 
     <input type="email" id="gEmail" placeholder="you@example.com" autocomplete="email">
     <input type="password" id="gPass" placeholder="password" autocomplete="current-password">
-    <input type="password" id="gPass2" placeholder="confirm password" autocomplete="new-password" style="display:none">
     <button class="btn-primary full" id="gGo">Sign in</button>
     <div class="preview" id="gMsg"></div>
-    <p class="gswap">
-      <span id="gSwapTxt">No account yet?</span>
-      <a href="#" id="gSwap">Create one</a>
-    </p>
+    <p class="gswap">No account? Accounts are added by invitation.</p>
     <p class="gfoot" id="gFoot">Forgot your password? Reset it from the Supabase
        dashboard under Authentication → Users.</p>
   </div>
@@ -744,7 +739,6 @@ function work(p,label){
    the app stays behind this gate until a real sign-in succeeds. An existing
    ANONYMOUS session from an older build is honoured rather than stranded,
    with a banner telling you what it is. */
-var GATE_MODE='signin';   /* 'signin' | 'signup' */
 
 function showGate(msg){
   $('gate').classList.add('show');
@@ -760,54 +754,16 @@ function gmsg(t,bad){
   if(!t){ m.className='preview'; m.innerHTML=''; return; }
   m.innerHTML=t; m.className='preview show'; m.style.color = bad?'#8f2d18':'';
 }
-function setGateMode(mode){
-  GATE_MODE=mode;
-  var up = mode==='signup';
-  $('gateTitle').textContent = up ? 'Create your Todonut account' : 'Sign in to Todonut';
-  $('gateSub').textContent   = up ? 'One account, every device. Your lists live in it, not in this file.'
-                                  : 'Your lists live in your account, not in this file.';
-  $('gPass2').style.display  = up ? '' : 'none';
-  $('gPass').setAttribute('autocomplete', up ? 'new-password' : 'current-password');
-  $('gGo').textContent       = up ? 'Create account' : 'Sign in';
-  $('gSwapTxt').textContent  = up ? 'Already have an account?' : 'No account yet?';
-  $('gSwap').textContent     = up ? 'Sign in' : 'Create one';
-  $('gFoot').style.display   = up ? 'none' : '';
-  gmsg(null);
-}
-$('gSwap').addEventListener('click',function(e){
-  e.preventDefault(); setGateMode(GATE_MODE==='signup'?'signin':'signup');
-});
+/* There is no sign-up here, on purpose. Sign-ups are off in the Supabase
+   project (switched off 2026-09-25, when Todonut was first published), so a
+   "Create one" button could only ever fail. Removed 2026-09-27, register R010.
+   Accounts are added from the Supabase dashboard (Authentication -> Add user). */
 
 function gateSubmit(){
   var em=$('gEmail').value.trim(), pw=$('gPass').value;
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return gmsg('That does not look like an email address.',true);
   if(pw.length<8) return gmsg('Password needs at least 8 characters.',true);
   $('gGo').disabled=true;
-
-  if(GATE_MODE==='signup'){
-    if(pw!==$('gPass2').value){ $('gGo').disabled=false; return gmsg('The two passwords do not match.',true); }
-    gmsg('Creating your account…');
-    sb.auth.signUp({email:em,password:pw}).then(function(r){
-      $('gGo').disabled=false;
-      if(r.error) throw r.error;
-      if(r.data.session){ return afterSignIn(r.data.user); }
-      /* no session back = the project requires email confirmation */
-      /* ORDER MATTERS: setGateMode() clears the message box, so the mode
-         switch must happen BEFORE the message is written. Getting this
-         backwards silently swallowed the only instruction the user needed —
-         the same shape of bug as the error banner clearing itself on reload. */
-      setGateMode('signin');
-      $('gEmail').value=em;
-      gmsg('<b>Account created — but it needs confirming.</b> Check '+esc(em)+
-           ' and click the link, then come back and sign in.<br><br>'+
-           'If the confirmation page fails to load, that is expected: this app runs '+
-           'from a file, so there is nowhere for the redirect to land. The '+
-           'confirmation still happened.');
-    }).catch(function(e){
-      $('gGo').disabled=false; gmsg('Could not create the account: '+esc(e.message||String(e)),true);
-    });
-    return;
-  }
 
   gmsg('Signing in…');
   sb.auth.signInWithPassword({email:em,password:pw}).then(function(r){
@@ -824,13 +780,13 @@ function gateSubmit(){
   });
 }
 $('gGo').addEventListener('click',gateSubmit);
-['gEmail','gPass','gPass2'].forEach(function(id){
+['gEmail','gPass'].forEach(function(id){
   $(id).addEventListener('keydown',function(e){ if(e.key==='Enter') gateSubmit(); });
 });
 
 function afterSignIn(user){
   USER=user;
-  $('gPass').value=''; $('gPass2').value=''; gmsg(null);
+  $('gPass').value=''; gmsg(null);
   hideGate(); refreshAcctChip();
   elAnon.classList.toggle('show', isAnon());
   return loadAll();
@@ -866,10 +822,10 @@ function boot(){
     }
     /* no session: stop here. Nothing is created. */
     setSync(null,'signed out');
-    setGateMode('signin');
+    gmsg(null);
     showGate();
   }).catch(function(e){
-    setGateMode('signin'); showGate();
+    gmsg(null); showGate();
     gmsg('Could not reach your account: '+esc(e.message||String(e)),true);
   });
 }
@@ -1748,7 +1704,7 @@ $('signOutBtn').addEventListener('click',function(){
     USER=null; LISTS=[]; openSet={}; render();
     elAnon.classList.remove('show'); clearErr();
     refreshAcctChip(); setSync(null,'signed out');
-    setGateMode('signin'); showGate();
+    gmsg(null); showGate();
   });
 });
 
