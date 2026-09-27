@@ -81,6 +81,15 @@
   .txt{flex:1 1 auto;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;
        word-break:break-word;hyphens:auto;font-size:16px;line-height:1.5;padding-top:1px;}
   li.done .txt{color:var(--muted);text-decoration:line-through;text-decoration-color:#c9bfae;}
+  /* --- editing an item's text in place (TRI-18): the row gives up its buttons
+         so the box gets the full width, because long entries are why this exists --- */
+  li.item:not(.arch) .txt{cursor:text;}
+  .cat.selecting li.item .txt{cursor:pointer;}
+  li.item.editing{display:block;}
+  textarea.edit{display:block;resize:none;overflow:hidden;line-height:1.5;min-height:48px;}
+  .editbar{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;
+           scroll-margin-bottom:80px;}  /* clear of the fixed bottom bar (60px) */
+  .editbar .btn-primary{padding:8px 16px;}
   .del{flex:0 0 auto;background:none;color:#c9bcae;font-size:17px;line-height:1;
        padding:3px 6px;border-radius:8px;align-self:flex-start;}
   .del:hover{color:var(--danger);background:#fbeee9;}
@@ -674,6 +683,10 @@ var SUPABASE_KEY = 'sb_publishable_xmew25JUZnTip4LWtZ9ULg_x8Go9bXY';
 /* ---------------- state ---------------- */
 var sb=null, USER=null, LISTS=[], openSet={}, busy=0, DRAG=null;
 var selMode={}, picked={}, showArch={};
+/* The item being edited, if any: {id, orig, draft}. Held here and not only in the
+   textarea because render() rebuilds every row -- a draft kept in the DOM alone
+   would be wiped by any other action that happens to finish while you type. */
+var editing=null;
 
 var $=function(id){return document.getElementById(id);};
 var elCats=$('cats'), elDot=$('dot'), elSync=$('syncTxt'), elErr=$('errBanner'), elAnon=$('anonBanner');
@@ -885,6 +898,11 @@ function loadAll(){
 
 /* ---------------- render ---------------- */
 function render(){
+  /* If the editor has focus, remember where the cursor is so the rebuilt one can
+     carry on exactly where you were typing. */
+  var ae=document.activeElement;
+  var editFocused=!!(editing && ae && ae.classList && ae.classList.contains('edit'));
+  if(editFocused) editing.sel=[ae.selectionStart, ae.selectionEnd];
   elCats.innerHTML='';
   if(!LISTS.length){
     var n=document.createElement('div'); n.className='nothing';
@@ -913,6 +931,7 @@ function render(){
     head.appendChild(chev); head.appendChild(name); head.appendChild(pill);
     head.addEventListener('click',function(){
       openSet[cat.id]=!openSet[cat.id]; card.classList.toggle('open',!!openSet[cat.id]);
+      var ed=card.querySelector('textarea.edit'); if(ed) grow(ed);  /* hidden, it measured 0 tall */
     });
     head.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){e.preventDefault();head.click();} });
     card.appendChild(head);
@@ -987,6 +1006,7 @@ function render(){
           ul.appendChild(li);
           return;
         }
+        if(editing && editing.id===item.id){ renderEditor(li, item); ul.appendChild(li); return; }
         var box=document.createElement('button'); box.className='box';
         box.setAttribute('aria-label',item.done?'Mark not done':'Mark done');
         box.textContent=item.done?'✓':'';
@@ -999,6 +1019,7 @@ function render(){
         pri.addEventListener('click',function(){ openPri([item], cat); });
 
         var txt=document.createElement('div'); txt.className='txt'; txt.textContent=item.text;
+        txt.addEventListener('click',function(){ startEdit(item); });
         var mv=document.createElement('button');
         mv.className='mv'; mv.textContent='→';
         mv.title='Move to another list';
@@ -1082,7 +1103,7 @@ function render(){
     add.appendChild(ai); add.appendChild(ab); body.appendChild(add);
     if(LISTS.length>1 && items.length){
       var hint=document.createElement('div'); hint.className='movehint';
-      hint.textContent='Tap → to move one item. Select… moves several at once, and can split them into a brand-new list. On a computer you can also drag an item onto a list.';
+      hint.textContent='Tap an item\'s text to edit it. Tap → to move one item. Select… moves several at once, and can split them into a brand-new list. On a computer you can also drag an item onto a list.';
       body.appendChild(hint);
     }
 
@@ -1124,6 +1145,80 @@ function render(){
 
     card.appendChild(body); elCats.appendChild(card);
   });
+
+  var ed=elCats.querySelector('textarea.edit');
+  if(ed){
+    grow(ed);
+    if(editing.focus || editFocused){
+      ed.focus();
+      var s = editing.focus ? [ed.value.length, ed.value.length] : editing.sel;
+      ed.setSelectionRange(s[0], s[1]);
+      editing.focus=false;
+      showEditBar(ed);
+    }
+  }
+}
+
+/* ---------------- edit an item's text (TRI-18) ---------------- */
+/* Tap the text, edit in place, Save or Cancel. Enter saves and Esc cancels. Item
+   text is one line everywhere else, so a pasted line break becomes a space. */
+function renderEditor(li, item){
+  li.classList.add('editing');
+  var ta=document.createElement('textarea'); ta.className='edit'; ta.rows=1;
+  ta.value=editing.draft;
+  ta.setAttribute('aria-label','Edit item text');
+  ta.addEventListener('input',function(){ editing.draft=ta.value; grow(ta); showEditBar(ta); });
+  ta.addEventListener('keydown',function(e){
+    if(e.isComposing) return;
+    if(e.key==='Enter'){ e.preventDefault(); saveEdit(item); }
+    else if(e.key==='Escape'){ e.preventDefault(); cancelEdit(); }
+  });
+  var bar=document.createElement('div'); bar.className='editbar';
+  var cx=document.createElement('button'); cx.className='btn-ghost editcancel'; cx.textContent='Cancel';
+  cx.addEventListener('click',cancelEdit);
+  var sv=document.createElement('button'); sv.className='btn-primary editsave'; sv.textContent='Save';
+  sv.addEventListener('click',function(){ saveEdit(item); });
+  bar.appendChild(cx); bar.appendChild(sv);
+  li.appendChild(ta); li.appendChild(bar);
+}
+function grow(ta){
+  if(!ta.scrollHeight) return;              /* inside a collapsed list: nothing to measure yet */
+  ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px';
+}
+/* Focusing scrolls the text box into view, not the buttons under it, so opened
+   low on the screen -- or grown by typing -- Save and Cancel sat under the fixed
+   bottom bar. 'nearest' scrolls only when they are actually hidden. */
+function showEditBar(ta){
+  var bar=ta.parentNode && ta.parentNode.querySelector('.editbar');
+  if(bar && bar.scrollIntoView) bar.scrollIntoView({block:'nearest'});
+}
+function findLive(id){
+  for(var i=0;i<LISTS.length;i++){
+    var hit=(LISTS[i].items||[]).filter(function(x){ return x.id===id && !x.archived_at; })[0];
+    if(hit) return hit;
+  }
+  return null;
+}
+function startEdit(item){
+  if(item._pending) return;                 /* not in the database yet: nothing to update */
+  /* One editor at a time, and never throw away typing: an open edit with changes
+     has to be saved or cancelled first. One with no changes just gives way. */
+  if(editing && editing.id!==item.id && findLive(editing.id) && editing.draft!==editing.orig){
+    setSync('ok','Save or cancel the item you are editing first');
+    return;
+  }
+  editing={id:item.id, orig:item.text, draft:item.text, focus:true};
+  render();
+}
+function cancelEdit(){ editing=null; render(); }
+function saveEdit(item){
+  var v=(editing ? editing.draft : '').replace(/\s*[\r\n]+\s*/g,' ').trim();
+  editing=null;
+  if(!v || v===item.text){ render(); return; }  /* blank or unchanged: nothing to send */
+  item.text=v; render();
+  work(sb.from('items').update({text:v}).eq('id',item.id),'saving')
+    .then(function(r){ if(r.error) throw r.error; setSync('ok','text saved'); })
+    .catch(function(e){ fail(e,'Could not save that edit'); });
 }
 
 /* two-tap confirm — no browser dialogs */
