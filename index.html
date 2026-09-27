@@ -18,6 +18,8 @@
   (R022); groups carrying the colour (R023); freeform rows (R024); and a
   setting to arrange favorites by group instead (R025). Then feed tabs
   (R031-R036): tabs under the favorites (R032), managed in Settings (R033).
+  Coming back into view re-reads everything quietly (R029); a load refused
+  with "JWT issued at future" is retried once (R037).
   Published by Code-CB dot com as index.html (R005/R018) -- never from this project.
 -->
 <style>
@@ -1293,8 +1295,16 @@ function recheckCols(){
 }
 // After a resize has settled, and whenever the tab comes back into view.
 window.addEventListener("resize", function(){ clearTimeout(resizeTimer); resizeTimer = setTimeout(recheckCols, 250); });
-document.addEventListener("visibilitychange", function(){ if (!document.hidden) recheckCols(); });
-window.addEventListener("pageshow", recheckCols);
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  recheckCols();
+  comeBack();                                     // R029
+});
+window.addEventListener("pageshow", function(e){
+  recheckCols();
+  if (e.persisted) comeBack();                    // restored from the browser's back/forward cache
+});
+window.addEventListener("pagehide", function(){ hiddenAt = Date.now(); });
 
 // ---------------------------------------------------------------- signed in / out
 function showSignedOut(){
@@ -1318,9 +1328,13 @@ function showSignedIn(session){
   load();
 }
 
-function load(){
+// opts.quiet: a background re-read (R029) -- no "Loading…" message, the open
+// tab kept, and a failure leaves the page as it was (said in the status line).
+// opts.retried: set on the one automatic retry (R037).
+function load(opts){
+  opts = opts || {};
   var msg = $("loadMsg");
-  msg.className = "note"; msg.textContent = "Loading your page…"; msg.hidden = false;
+  if (!opts.quiet) { msg.className = "note"; msg.textContent = "Loading your page…"; msg.hidden = false; }
   Promise.all([
     queryFavs(),
     sb.from("feeds").select(FEED_COLS).order("col").order("position"),
@@ -1337,7 +1351,7 @@ function load(){
     state.groups = r[4].data;
     state.feeds = r[1].data.map(feedFromRow);
     state.tabs = r[5].data;
-    chooseTab();
+    if (!opts.quiet || !tabList().some(function(t){ return t.id === currentTab; })) chooseTab();
     applySettings(r[2].data);
     msg.hidden = true;
     // An empty answer is not a failed one (R17): say which it is.
@@ -1349,9 +1363,34 @@ function load(){
     lastVis = visibleCols();
     refresh();
   }).catch(function(e){
+    var text = e && e.message ? e.message : String(e);
+    // Right after the sign-in is renewed, the database's clock can be a moment
+    // behind the sign-in server's, and it refuses the new token as "issued at
+    // future" (seen 2026-09-27; a reload seconds later worked). Try once more.
+    if (!opts.retried && /issued at future/i.test(text)) {
+      setTimeout(function(){ load({quiet: opts.quiet, retried: true}); }, 2000);
+      return;
+    }
+    if (opts.quiet) {
+      var s = $("feedStatus"); s.className = "feed-state err";
+      s.textContent = "Couldn't re-read your page: " + text + " — showing what was loaded before.";
+      return;
+    }
     msg.className = "note err";
-    msg.textContent = "Could not load your page: " + (e && e.message ? e.message : e);
+    msg.textContent = "Could not load your page: " + text;
   });
+}
+
+// Coming back into view after a while, re-read everything quietly (R029): the
+// PC and the iPad, or two tabs, may have changed things meanwhile (seen
+// 2026-09-27: groups made in two tabs, each unaware of the other's). Not while
+// something is being edited, dragged or is open in a dialog.
+var hiddenAt = 0, AWAY_MS = 30000;
+function comeBack(){
+  if (!userId || !hiddenAt || Date.now() - hiddenAt < AWAY_MS) return;
+  if (editing || drag || document.querySelector("dialog[open]")) return;
+  hiddenAt = 0;
+  load({quiet: true});
 }
 
 // Stored copies are already on screen; now ask the fetcher to re-read any feed
