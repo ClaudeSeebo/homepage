@@ -9,12 +9,16 @@
 <title>Home</title>
 <!--
   Seebo's start page (Code-Homepage). Built piece by piece (register R011-R018).
-  Now at R016: favorites, feeds and settings come from the database (schema
+  Favorites, feeds and settings come from the database (schema
   `homepage`, locked to his account, R012) after he signs in with Todonut's
   sign-in; headlines come from `feed_cache` at once, then from the fetcher
   (Edge Function `homepage-feeds`, acting as him). Every edit saves (R015
-  favorites, R016 feeds); a new feed is checked live by the fetcher first. Published by Code-CB dot com as index.html
-  (R005/R018) -- never from this project.
+  favorites, R016 feeds); a new feed is checked live by the fetcher first.
+  2026-09-27, the favorites plan (R021-R026): a Settings button beside Add
+  (R022); groups carrying the colour (R023); freeform rows (R024); and a
+  setting to arrange favorites by group instead (R025). Then feed tabs
+  (R031-R036): tabs under the favorites (R032), managed in Settings (R033).
+  Published by Code-CB dot com as index.html (R005/R018) -- never from this project.
 -->
 <style>
 :root{
@@ -41,15 +45,20 @@ h2{font-size:.8rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase
 
 /* ---- top: quick-launch row + Edit switch ------------------------------ */
 .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.quick{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+/* The quick row keeps at least 260px: with Add, Settings and Edit beside it
+   (about 300px), a phone wraps the buttons onto their own line instead of
+   squeezing the quick row to one pill per line (seen at 375px, 2026-09-27). */
+.quick{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 260px;min-width:0}
 .q{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 6px;
   border:1px solid var(--line);border-radius:999px;background:var(--card);
   text-decoration:none;font-size:.9rem;box-shadow:var(--shadow);white-space:nowrap}
 .q:hover,.q:focus-visible{border-color:var(--accent);outline:none}
 .q i{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;
   font:600 .7rem/1 system-ui,sans-serif;font-style:normal;color:#fff;background:var(--c)}
-.edit-toggle{border:1px solid var(--line);background:var(--card);border-radius:999px;
-  padding:5px 14px;cursor:pointer;box-shadow:var(--shadow)}
+.top-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+.top-btn{border:1px solid var(--line);background:var(--card);border-radius:999px;
+  padding:5px 14px;cursor:pointer;box-shadow:var(--shadow);white-space:nowrap}
+.top-btn:hover,.top-btn:focus-visible{border-color:var(--accent);outline:none}
 .edit-toggle[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .note{color:var(--muted);font-size:.85rem;margin:0 0 18px}
 .edit-only{display:none}
@@ -57,25 +66,59 @@ body.editing .edit-only{display:revert}
 
 /* ---- favorites -------------------------------------------------------- */
 .sec-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 8px}
-.fav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:26px}
+/* Favorites come in rows (R024): each row is its own grid with the same
+   columns, so a new row starts on a new line however full the last one is;
+   a long row still wraps on a narrow screen. */
+.fav-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:26px}
+.fav-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+body.editing .fav-grid{gap:14px}
+body.editing .fav-row{outline:1px dashed var(--line);outline-offset:4px;border-radius:12px}
+.fav-row.new-row{display:none}
+body.editing .fav-row.new-row{display:grid;min-height:48px;border:2px dashed var(--line);border-radius:12px;
+  padding:6px;align-items:center;outline:0}
+.new-row-hint{grid-column:1/-1;color:var(--muted);font-size:.85rem;text-align:center}
+.fav-row:has(.ph) .new-row-hint{display:none}
+/* Arranged by group (R025): a row per group, in group order, "No group" last.
+   An empty group's row shows only in Edit mode, as somewhere to drop; each
+   row is labelled with its group on its outline. */
+.fav-row{position:relative}
+.fav-row.empty-zone{display:none}
+body.editing .fav-row.empty-zone{display:grid;min-height:48px;align-items:center}
+body.editing .fav-grid.by-group{gap:24px;padding-top:12px}
+body.editing .fav-grid.by-group .fav-row[data-label]::before{content:attr(data-label);position:absolute;top:-19px;left:10px;
+  font-size:.72rem;line-height:1.2;color:var(--muted);background:var(--bg);padding:0 4px}
 .fav{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:56px;
   padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);
   text-decoration:none;box-shadow:var(--shadow);overflow:hidden}
 .fav:hover,.fav:focus-visible{border-color:var(--accent);outline:none}
 .fav b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fav small{color:var(--muted);font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fav.add{align-items:center;border-style:dashed;color:var(--muted);cursor:pointer;background:transparent}
-.fav.add span{font-size:1.4rem;line-height:1}
 .fav .tools{position:absolute;top:4px;right:4px;gap:2px}
 body.editing .fav .tools{display:flex}
-body.editing .fav:not(.add){padding-right:64px}  /* room for the ✎ ✕ so they never cover the name */
+body.editing .fav[data-drag]{padding-right:64px}  /* room for the ✎ ✕ so they never cover the name */
 .fav .tools{display:none}
+/* Setting "name only" (R022): no address line, and a shorter tile. */
+.fav-grid.name-only .fav{min-height:42px}
+.fav-grid.name-only .fav small.addr{display:none}
+/* In Edit mode the second line shows the favorite's group, not its address (R023). */
+.fav small.grp{display:none}
+body.editing .fav small.grp{display:block}
+body.editing .fav small.addr{display:none}
+.fav small.grp.none{font-style:italic}
 
 /* ---- feeds ------------------------------------------------------------ */
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border:0;background:var(--card);padding:3px 10px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .small-btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;cursor:pointer}
+/* Feed tabs (R032) */
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+.tab{border:1px solid transparent;border-bottom:0;background:transparent;border-radius:10px 10px 0 0;
+  padding:6px 14px;margin-bottom:-1px;cursor:pointer;color:var(--muted)}
+.tab:hover,.tab:focus-visible{color:var(--ink);outline:none}
+.tab[aria-selected="true"]{background:var(--card);border-color:var(--line);color:var(--ink);font-weight:600}
+.tab .n{font-size:.75rem;color:var(--muted);margin-left:6px;font-weight:400}
+.tab.unassigned{font-style:italic}
 .cols{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:14px;align-items:start}
 .col{display:flex;flex-direction:column;gap:14px;min-width:0}
 body.editing .col{min-height:120px;border-radius:12px;outline:1px dashed var(--line);outline-offset:4px}
@@ -102,6 +145,7 @@ body.editing .feed .tools{display:flex}
 .icon-btn{border:0;background:var(--soft);border-radius:6px;width:24px;height:24px;cursor:pointer;
   line-height:1;font-size:.8rem;padding:0}
 .icon-btn.del:hover{color:var(--danger)}
+.icon-btn:disabled{opacity:.35;cursor:default}
 .hint{color:var(--muted);font-size:.85rem;margin:8px 0 0}
 
 /* ---- dragging (edit mode only) ---------------------------------------- */
@@ -122,6 +166,38 @@ dialog .row button{border:1px solid var(--line);background:var(--card);border-ra
 dialog .row button[value="ok"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 dialog .fine{font-size:.8rem;color:var(--muted);margin:10px 0 0}
 dialog .opt{font-size:.78rem}
+dialog fieldset{border:0;padding:0;margin:12px 0 0;min-width:0}
+dialog legend{font-size:.85rem;color:var(--muted);padding:0;margin-bottom:2px}
+dialog label.radio{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:.95rem;margin:6px 0;cursor:pointer}
+dialog label.radio input{width:auto;margin:0}
+dialog select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);color:var(--ink);font:inherit}
+.newgrp{margin-top:8px;padding:2px 0 4px 12px;border-left:3px solid var(--line)}
+/* Settings' group list (R023) */
+#setDlg{max-height:calc(100vh - 32px);overflow:auto}
+#groupList,#tabList{margin:4px 0 8px}
+/* Settings' two parts (R033) */
+.set-switch{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 4px}
+.set-switch button{border:1px solid transparent;border-bottom:0;background:transparent;border-radius:8px 8px 0 0;
+  padding:5px 12px;margin-bottom:-1px;cursor:pointer;color:var(--muted)}
+.set-switch button[aria-selected="true"]{background:var(--card);border-color:var(--line);color:var(--ink);font-weight:600}
+/* Feeds & tabs (R033) */
+.tabrow{display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--line)}
+.tabrow:first-child{border-top:0}
+dialog .tabrow input{flex:1;width:auto;min-width:0;padding:6px 8px}
+dialog label.inline{display:block;margin:6px 0 4px}
+#mvList{margin-top:8px;max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.mvrow{display:flex;align-items:center;gap:8px;padding:5px 8px;border-top:1px solid var(--line)}
+.mvrow:first-child{border-top:0}
+.mvrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
+dialog .mvrow select{width:auto;max-width:45%;padding:4px 6px;font-size:.85rem}
+.grp{padding:8px 0;border-top:1px solid var(--line)}
+.grp:first-child{border-top:0}
+.grp-line{display:flex;align-items:center;gap:6px}
+dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
+.grp-count{font-size:.78rem;color:var(--muted);white-space:nowrap}
+.swatches.small{gap:6px;margin-top:6px}
+.swatches.small .swatch{width:22px;height:22px}
 
 /* ---- favorite colours (R017) -------------------------------------------
    A tint behind the button and a coloured edge. Text contrast measured
@@ -170,7 +246,13 @@ dialog .opt{font-size:.78rem}
 <main>
   <header class="top">
     <nav class="quick" aria-label="Quick launch" id="quick"></nav>
-    <button class="edit-toggle" id="editBtn" aria-pressed="false" hidden>Edit</button>
+    <!-- Add and Settings sit beside Edit (Seebo, 2026-09-27, at R025's check),
+         so the favorite rows start clean at the left. -->
+    <span class="top-actions">
+      <button class="top-btn" id="addBtn" data-action="add-fav" hidden>+ Add favorite</button>
+      <button class="top-btn" id="setBtn" data-action="settings" hidden>⚙&#xFE0E; Settings</button>
+      <button class="top-btn edit-toggle" id="editBtn" aria-pressed="false" hidden>Edit</button>
+    </span>
   </header>
   <p class="note edit-only" id="buildNote">Changes save as you make them. Quick-launch buttons are added by
     asking Claude.</p>
@@ -207,7 +289,11 @@ dialog .opt{font-size:.78rem}
         <button class="small-btn" data-action="add-feed">+ Add feed</button>
       </span>
     </div>
+    <!-- Feed tabs (R032): under the favorites, as Seebo placed them; the
+         column setting applies to every tab. -->
+    <div class="tabs" id="tabs" role="tablist" aria-label="Feed tabs"></div>
     <div class="cols" id="cols"></div>
+    <p class="note" id="tabEmpty" hidden>No feeds in this tab yet.</p>
     <p class="hint edit-only" id="narrowHint" hidden>This screen shows fewer columns than your setting, so feeds are
       rearranged on a wider screen.</p>
     <p class="note" id="emptyMsg" hidden>Signed in, but this account has no favorites or feeds.</p>
@@ -225,14 +311,72 @@ dialog .opt{font-size:.78rem}
       <label for="fShort">Short name <span class="opt">(optional — shown on the button)</span></label>
       <input id="fShort" autocomplete="off" maxlength="40">
     </div>
-    <div id="colorRow">
-      <label id="colorLbl">Colour</label>
-      <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
+    <!-- A favorite's colour is its group's (R023, ruled 2026-09-27). -->
+    <div id="groupRow">
+      <label for="fGroup">Group <span class="opt">(the group sets the colour)</span></label>
+      <select id="fGroup"></select>
+      <div class="newgrp" id="newGroupRow" hidden>
+        <label for="ngName">New group's name</label>
+        <input id="ngName" autocomplete="off" maxlength="40" pattern=".*\S.*" title="A name, not just spaces">
+        <label id="colorLbl">Its colour</label>
+        <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
+      </div>
     </div>
     <label for="fUrl">Address</label>
     <input id="fUrl" inputmode="url" autocomplete="off" placeholder="https://…">
+    <!-- Adding only (R024, ruled: both ways — here, and dragging onto "+ New row"). -->
+    <fieldset id="rowRow">
+      <legend>Put it on</legend>
+      <label class="radio"><input type="radio" name="favRow" value="last" checked> the last row</label>
+      <label class="radio"><input type="radio" name="favRow" value="new"> a new row</label>
+    </fieldset>
     <p class="fine" id="dlgFine"></p>
     <div class="row"><button type="button" id="dlgCancel">Cancel</button><button value="ok">Save</button></div>
+  </form>
+</dialog>
+
+<!-- Settings (R022): each choice saves as it is made, like every other edit. -->
+<dialog id="setDlg" aria-labelledby="setH">
+  <form method="dialog" id="setForm">
+    <h3 id="setH">Settings</h3>
+    <!-- Two parts so it stays short (R033): favorites, and feeds & tabs. -->
+    <div class="set-switch" role="tablist" aria-label="Settings sections">
+      <button type="button" role="tab" data-panel="fav" aria-selected="true">Favorites</button>
+      <button type="button" role="tab" data-panel="feeds" aria-selected="false">Feeds &amp; tabs</button>
+    </div>
+    <div data-panel-body="fav">
+    <fieldset>
+      <legend>Favorites show</legend>
+      <label class="radio"><input type="radio" name="favLabel" value="name_url"> Name and address</label>
+      <label class="radio"><input type="radio" name="favLabel" value="name"> Name only</label>
+    </fieldset>
+    <fieldset>
+      <legend>Arrange favorites</legend>
+      <label class="radio"><input type="radio" name="favLayout" value="rows"> Freeform, by row</label>
+      <label class="radio"><input type="radio" name="favLayout" value="groups"> By group — a row for each group, in the order below</label>
+    </fieldset>
+    <fieldset>
+      <legend>Groups <span class="opt">— a group's colour is used by all its favorites</span></legend>
+      <div id="groupList"></div>
+      <button type="button" class="small-btn" id="grpAdd">+ New group</button>
+    </fieldset>
+    <p class="fine">Changes save as you make them. Deleting a group keeps its favorites, without a group.</p>
+    </div>
+    <div data-panel-body="feeds" hidden>
+    <fieldset>
+      <legend>Tabs <span class="opt">— rename, reorder, add; a tab can be deleted only when it is empty</span></legend>
+      <div id="tabList"></div>
+      <button type="button" class="small-btn" id="tabAdd">+ New tab</button>
+    </fieldset>
+    <fieldset>
+      <legend>Move feeds between tabs</legend>
+      <label for="mvFrom" class="inline">Show the feeds in</label>
+      <select id="mvFrom"></select>
+      <div id="mvList"></div>
+    </fieldset>
+    <p class="fine">Changes save as you make them. A feed moved to another tab keeps its column and place there.</p>
+    </div>
+    <div class="row"><button value="ok">Done</button></div>
   </form>
 </dialog>
 
@@ -260,7 +404,9 @@ var SUPABASE_KEY = "sb_publishable_xmew25JUZnTip4LWtZ9ULg_x8Go9bXY";
 var sb = null, userId = null;
 
 // Filled from the database once signed in; empty until then.
-var state = {columns: 2, favorites: [], feeds: []};
+// favLabel / favLayout: the settings row's fav_label / fav_layout (R021).
+function emptyState(){ return {columns: 2, favLabel: "name_url", favLayout: "rows", favorites: [], groups: [], feeds: [], tabs: []}; }
+var state = emptyState();
 var editing = false;
 var MIN_COUNT = 1, MAX_COUNT = 20;
 
@@ -303,30 +449,233 @@ function renderQuick(){
   }).join("");
 }
 
+function favTile(f){
+  // The short name, if set, is what the button shows; the full name on hover (R015).
+  // The colour is the group's (R023); a favorite's own old `color` is no longer used.
+  var g = groupOf(f);
+  var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
+  return '<a class="fav"' + colour + ' data-drag="fav" data-id="' + f.id + '" href="' + esc(f.url) + '" title="' + esc(f.title) + '">' +
+    '<b>' + esc(f.short || f.title) + '</b><small class="addr">' + esc(host(f.url)) + '</small>' +
+    '<small class="grp' + (g ? '' : ' none') + '">' + esc(g ? g.name : "No group") + '</small>' +
+    '<span class="tools">' +
+      '<button class="icon-btn" data-action="edit-fav" data-id="' + f.id + '" aria-label="Edit ' + esc(f.title) + '">✎</button>' +
+      '<button class="icon-btn del" data-action="del-fav" data-id="' + f.id + '" aria-label="Delete ' + esc(f.title) + '">✕</button>' +
+    '</span></a>';
+}
 function renderFavs(){
-  var html = '<button class="fav add" data-action="add-fav" aria-label="Add favorite"><span>+</span>' +
-             '<small>Add favorite</small></button>';
-  html += state.favorites.map(function(f){
-    // The short name, if set, is what the button shows; the full name on hover (R015).
-    var colour = COLORS.indexOf(f.color) >= 0 ? ' data-color="' + f.color + '"' : '';   // R017
-    return '<a class="fav"' + colour + ' data-drag="fav" data-id="' + f.id + '" href="' + esc(f.url) + '" title="' + esc(f.title) + '">' +
-      '<b>' + esc(f.short || f.title) + '</b><small>' + esc(host(f.url)) + '</small>' +
-      '<span class="tools">' +
-        '<button class="icon-btn" data-action="edit-fav" data-id="' + f.id + '" aria-label="Edit ' + esc(f.title) + '">✎</button>' +
-        '<button class="icon-btn del" data-action="del-fav" data-id="' + f.id + '" aria-label="Delete ' + esc(f.title) + '">✕</button>' +
-      '</span></a>';
-  }).join("");
-  $("favGrid").innerHTML = html;
+  // Add and Settings live beside Edit at the top (moved there at R025's
+  // check), so every row here holds favorites only.
+  $("favGrid").classList.toggle("name-only", state.favLabel === "name");
+  var byGroup = state.favLayout === "groups";
+  $("favGrid").classList.toggle("by-group", byGroup);
+  var zones = byGroup ? groupZones() : rowZones();
+  $("favGrid").innerHTML = zones.map(function(z){
+    return '<div class="fav-row' + (z.favs.length ? '' : ' empty-zone') + '" data-zone="fav"' + (z.attrs || '') +
+        (z.label ? ' data-label="' + esc(z.label) + '"' : '') + '>' +
+        (z.favs.length ? z.favs.map(favTile).join("") : (z.hint ? '<span class="new-row-hint">' + esc(z.hint) + '</span>' : '')) +
+      '</div>';
+  }).join("") + (byGroup ? '' :
+    '<div class="fav-row new-row" data-zone="fav"><span class="new-row-hint">+ New row — drop a favorite here</span></div>');
+}
+// Freeform rows (R024): one drop zone per row, in row order (gaps in the
+// numbers are harmless); "+ New row" follows, seen only in Edit mode.
+function rowZones(){
+  sortFavs();
+  var zones = [];
+  state.favorites.forEach(function(f){
+    var last = zones[zones.length - 1];
+    if (last && last.row === f.row) last.favs.push(f); else zones.push({row: f.row, favs: [f]});
+  });
+  return zones.length ? zones : [{favs: []}];
+}
+// By group (R025): one zone per group in group order, then "No group". The
+// freeform arrangement is left untouched, so switching back restores it.
+function groupZones(){
+  sortGroups();
+  var lists = {};
+  state.favorites.forEach(function(f){ (lists[f.group || 0] = lists[f.group || 0] || []).push(f); });
+  Object.keys(lists).forEach(function(k){
+    lists[k].sort(function(a, b){ return a.gpos - b.gpos || a.row - b.row || a.position - b.position || a.id - b.id; });
+  });
+  return state.groups.map(function(g){
+    return {favs: lists[g.id] || [], attrs: ' data-group="' + g.id + '"', label: g.name,
+            hint: g.name + " is empty — drop a favorite here to add it"};
+  }).concat([{favs: lists[0] || [], attrs: ' data-group=""', label: "No group",
+              hint: "Drop a favorite here to take it out of its group"}]);
 }
 
+// ---------------------------------------------------------------- feed tabs (R032)
+// Only the open tab's feeds are drawn. A feed with no tab (possible until
+// R036 makes the tab required: the page published before tabs adds feeds
+// without one) shows under "Unassigned", so nothing is ever hidden. The open
+// tab is remembered in this browser only; a new device starts on the first.
+var TAB_KEY = "homepage-tab", currentTab = null;
+function sortTabs(){ state.tabs.sort(function(a, b){ return a.position - b.position || a.id - b.id; }); }
+function unassigned(f){ return !f.tab || !byId(state.tabs, f.tab); }
+function tabList(){
+  sortTabs();
+  var list = state.tabs.slice();
+  if (state.feeds.some(unassigned)) list.push({id: "none", name: "Unassigned"});
+  return list;
+}
+function chooseTab(){
+  var list = tabList(), saved = null;
+  try { saved = localStorage.getItem(TAB_KEY); } catch (e) {}
+  var hit = list.find(function(t){ return String(t.id) === saved; });
+  currentTab = hit ? hit.id : (list.length ? list[0].id : null);
+}
+function feedsInTab(){
+  return state.feeds.filter(function(f){ return currentTab === "none" ? unassigned(f) : f.tab === currentTab; });
+}
+function renderTabs(){
+  var list = tabList();
+  if (!list.some(function(t){ return t.id === currentTab; })) chooseTab();
+  $("tabs").innerHTML = list.map(function(t){
+    var n = state.feeds.filter(function(f){ return t.id === "none" ? unassigned(f) : f.tab === t.id; }).length;
+    return '<button class="tab' + (t.id === "none" ? ' unassigned' : '') + '" role="tab" data-tab="' + t.id + '" aria-selected="' +
+      String(t.id === currentTab) + '">' + esc(t.name) + '<span class="n">' + n + '</span></button>';
+  }).join("");
+}
+$("tabs").addEventListener("click", function(e){
+  var b = e.target.closest("[data-tab]");
+  if (!b) return;
+  currentTab = b.dataset.tab === "none" ? "none" : +b.dataset.tab;
+  try { localStorage.setItem(TAB_KEY, String(currentTab)); } catch (err) {}
+  renderFeeds();
+});
+
+// ---------------------------------------------------------------- Settings -> Feeds & tabs (R033)
+// Tabs: rename, reorder, add, delete. Delete only an EMPTY tab and never the
+// last one -- the page says why; the database refuses a tab that still holds
+// feeds anyway (on delete restrict, R031). Moving a feed changes only its tab:
+// its column and place are kept, so the page published before tabs, which
+// sorts every feed together, is not disturbed while this is tested.
+var setPanel = "fav", mvFrom = null;
+document.querySelector(".set-switch").addEventListener("click", function(e){
+  var b = e.target.closest("[data-panel]");
+  if (b) showPanel(b.dataset.panel);
+});
+function showPanel(p){
+  setPanel = p;
+  document.querySelectorAll(".set-switch [data-panel]").forEach(function(b){ b.setAttribute("aria-selected", String(b.dataset.panel === p)); });
+  document.querySelectorAll("[data-panel-body]").forEach(function(d){ d.hidden = d.dataset.panelBody !== p; });
+  if (p === "feeds") { renderTabList(); renderMover(); }
+}
+function tabCount(id){ return state.feeds.filter(function(f){ return f.tab === id; }).length; }
+function saveTabRow(t, patch){ return sb.from("feed_tabs").update(patch).eq("id", t.id).select("id").then(oneRow); }
+function renderTabList(){
+  sortTabs();
+  $("tabList").innerHTML = state.tabs.map(function(t, i){
+    var n = tabCount(t.id);
+    return '<div class="tabrow" data-tid="' + t.id + '">' +
+      '<input class="tab-name" value="' + esc(t.name) + '" maxlength="30" aria-label="Tab name">' +
+      '<span class="grp-count">' + n + ' feed' + (n === 1 ? '' : 's') + '</span>' +
+      '<button type="button" class="icon-btn" data-tb="up" aria-label="Move ' + esc(t.name) + ' left"' + (i ? '' : ' disabled') + '>↑</button>' +
+      '<button type="button" class="icon-btn" data-tb="down" aria-label="Move ' + esc(t.name) + ' right"' + (i < state.tabs.length - 1 ? '' : ' disabled') + '>↓</button>' +
+      '<button type="button" class="icon-btn del" data-tb="del" aria-label="Delete tab ' + esc(t.name) + '">✕</button>' +
+    '</div>';
+  }).join("");
+}
+function tabFromEl(el){ return byId(state.tabs, el.closest(".tabrow").dataset.tid); }
+$("tabList").addEventListener("click", function(e){
+  var b = e.target.closest("[data-tb]");
+  if (!b) return;
+  var t = tabFromEl(b);
+  if (b.dataset.tb === "del") deleteTab(t); else moveTab(t, b.dataset.tb === "up" ? -1 : 1);
+});
+// Rename on change (Enter or leaving the box); an empty name puts the old one back.
+$("tabList").addEventListener("change", function(e){
+  if (!e.target.classList.contains("tab-name")) return;
+  var t = tabFromEl(e.target), v = e.target.value.trim().slice(0, 30);
+  if (!v) { e.target.value = t.name; return; }
+  if (v === t.name) return;
+  t.name = v; e.target.value = v;
+  var row = e.target.closest(".tabrow");
+  row.querySelector('[data-tb="up"]').setAttribute("aria-label", "Move " + v + " left");
+  row.querySelector('[data-tb="down"]').setAttribute("aria-label", "Move " + v + " right");
+  row.querySelector('[data-tb="del"]').setAttribute("aria-label", "Delete tab " + v);
+  renderTabs(); renderMover();
+  saveTabRow(t, {name: v}).then(feedSaved).catch(feedFailed);
+});
+$("tabList").addEventListener("keydown", function(e){
+  if (e.key === "Enter" && e.target.classList.contains("tab-name")) { e.preventDefault(); e.target.blur(); }
+});
+function moveTab(t, dir){
+  sortTabs();
+  var i = state.tabs.indexOf(t), j = i + dir;
+  if (j < 0 || j >= state.tabs.length) return;
+  state.tabs[i] = state.tabs[j]; state.tabs[j] = t;
+  var changed = [];
+  state.tabs.forEach(function(x, k){ if (x.position !== k) { x.position = k; changed.push(x); } });
+  renderTabList(); renderTabs(); renderMover();
+  Promise.all(changed.map(function(x){ return saveTabRow(x, {position: x.position}); })).then(feedSaved).catch(feedFailed);
+}
+function deleteTab(t){
+  var n = tabCount(t.id);
+  if (n) { alert('"' + t.name + '" still has ' + n + " feed" + (n === 1 ? "" : "s") + ". Move " + (n === 1 ? "it" : "them") +
+                 " to other tabs first (below), then delete the tab."); return; }
+  if (state.tabs.length === 1) { alert("This is the last tab, so it stays — new feeds need somewhere to go."); return; }
+  if (!confirm('Delete the empty tab "' + t.name + '"?')) return;
+  sb.from("feed_tabs").delete().eq("id", t.id).select("id").then(oneRow).then(function(){
+    state.tabs = state.tabs.filter(function(x){ return x !== t; });
+    if (currentTab === t.id) chooseTab();
+    renderTabList(); renderMover(); renderFeeds(); feedSaved();
+  }).catch(feedFailed);
+}
+$("tabAdd").addEventListener("click", function(){
+  var pos = state.tabs.reduce(function(m, t){ return Math.max(m, t.position + 1); }, 0);
+  sb.from("feed_tabs").insert({name: "New tab", position: pos}).select("id,name,position").then(oneRow).then(function(r){
+    var t = r.data[0];
+    state.tabs.push(t);
+    renderTabList(); renderTabs(); renderMover(); feedSaved();
+    var input = document.querySelector('.tabrow[data-tid="' + t.id + '"] .tab-name');
+    if (input) { input.focus(); input.select(); }
+  }).catch(feedFailed);
+});
+// Move feeds: pick a tab to list its feeds; each has a "Move to…" choice.
+function renderMover(){
+  var list = tabList();
+  if (!list.some(function(t){ return t.id === mvFrom; })) mvFrom = list.length ? list[0].id : null;
+  $("mvFrom").innerHTML = list.map(function(t){
+    var n = state.feeds.filter(function(f){ return t.id === "none" ? unassigned(f) : f.tab === t.id; }).length;
+    return '<option value="' + t.id + '">' + esc(t.name) + ' (' + n + ')</option>';
+  }).join("");
+  $("mvFrom").value = String(mvFrom);
+  var feeds = state.feeds.filter(function(f){ return mvFrom === "none" ? unassigned(f) : f.tab === mvFrom; })
+    .sort(function(a, b){ return a.col - b.col || a.pos - b.pos; });
+  $("mvList").innerHTML = feeds.length ? feeds.map(function(f){
+    return '<div class="mvrow"><span title="' + esc(f.title) + '">' + esc(f.title) + '</span>' +
+      '<select data-feed="' + f.id + '" aria-label="Move ' + esc(f.title) + ' to"><option value="">Move to…</option>' +
+      state.tabs.filter(function(t){ return t.id !== f.tab; }).map(function(t){
+        return '<option value="' + t.id + '">' + esc(t.name) + '</option>';
+      }).join("") + '</select></div>';
+  }).join("") : '<p class="fine" style="margin:0;padding:8px">No feeds in this tab.</p>';
+}
+$("mvFrom").addEventListener("change", function(){
+  mvFrom = this.value === "none" ? "none" : +this.value;
+  renderMover();
+});
+$("mvList").addEventListener("change", function(e){
+  var sel = e.target.closest("select[data-feed]");
+  if (!sel || !sel.value) return;
+  var f = byId(state.feeds, sel.dataset.feed), from = f.tab, to = +sel.value;
+  f.tab = to;                                         // column and place kept (see above)
+  renderMover(); renderTabList(); renderFeeds();
+  sb.from("feeds").update({tab_id: to}).eq("id", f.id).select("id").then(oneRow).then(feedSaved)
+    .catch(function(err){ f.tab = from; feedFailed(err); });
+});
+
 function renderFeeds(){
+  renderTabs();
   var vis = visibleCols();
   var canDrag = vis === state.columns;
   var cols = $("cols");
   cols.style.setProperty("--n", vis);
   var buckets = [];
   for (var i = 0; i < vis; i++) buckets.push([]);
-  state.feeds.slice().sort(function(a, b){ return a.col - b.col || a.pos - b.pos; })
+  var shown = feedsInTab();
+  $("tabEmpty").hidden = shown.length > 0 || !state.tabs.length;
+  shown.sort(function(a, b){ return a.col - b.col || a.pos - b.pos; })
     .forEach(function(f){ buckets[Math.min(f.col, vis - 1)].push(f); });
   cols.innerHTML = buckets.map(function(list, ci){
     return '<div class="col" data-zone="feed" data-col="' + ci + '">' + list.map(function(f){
@@ -374,28 +723,55 @@ var dlgSave = null, dlgColor = null;
 // The small set (R007 c); null = none. Names, not colour codes, are stored,
 // so a tint can be retuned for light and dark without touching data.
 var COLORS = ["red", "orange", "amber", "green", "teal", "blue", "purple", "pink"];
-function renderSwatches(){
-  $("swatches").innerHTML = [null].concat(COLORS).map(function(c){
+// `attr` names the attribute a click handler reads the choice from.
+function swatchesHtml(selected, attr){
+  return [null].concat(COLORS).map(function(c){
     return '<button type="button" class="swatch' + (c ? '' : ' none') + '"' + (c ? ' data-color="' + c + '"' : '') +
-      ' data-pick="' + (c || "") + '" aria-pressed="' + String(c === dlgColor) + '" aria-label="' + (c || "no colour") + '"></button>';
+      ' ' + attr + '="' + (c || "") + '" aria-pressed="' + String(c === selected) + '" aria-label="' + (c || "no colour") + '"></button>';
   }).join("");
 }
+function renderSwatches(){ $("swatches").innerHTML = swatchesHtml(dlgColor, "data-pick"); }
 $("swatches").addEventListener("click", function(e){
   var b = e.target.closest("[data-pick]");
   if (!b) return;
   dlgColor = b.dataset.pick || null;
   renderSwatches();
 });
-// v: {name, url, short, color}; isFav shows the short-name and colour fields.
+// The group choice: "No group", each group in order, or "+ New group…",
+// which opens a name and colour. The name is required only while it shows
+// (a hidden required field would block Save with nothing to see).
+function fillGroupSelect(selectedId){
+  sortGroups();
+  $("fGroup").innerHTML = '<option value="">No group</option>' + state.groups.map(function(g){
+    return '<option value="' + g.id + '">' + esc(g.name) + '</option>';
+  }).join("") + '<option value="new">+ New group…</option>';
+  $("fGroup").value = selectedId ? String(selectedId) : "";
+  showNewGroup();
+}
+function showNewGroup(){
+  var on = $("fGroup").value === "new";
+  $("newGroupRow").hidden = !on;
+  $("ngName").required = on;
+}
+$("fGroup").addEventListener("change", function(){
+  showNewGroup();
+  if ($("fGroup").value === "new") $("ngName").focus();
+});
+// v: {name, url, short, group, askRow}; isFav shows the short-name and group
+// fields; askRow (adding a favorite) shows "Put it on: last row / new row".
 function openDialog(title, v, fine, onSave, isFav){
   $("dlgTitle").textContent = title;
   $("fName").value = v.name || "";
   $("fShort").value = v.short || "";
   $("fUrl").value = v.url || "";
   $("shortRow").hidden = !isFav;
-  $("colorRow").hidden = !isFav;
-  dlgColor = COLORS.indexOf(v.color) >= 0 ? v.color : null;
+  $("groupRow").hidden = !isFav;
+  $("rowRow").hidden = !v.askRow;
+  document.querySelector('#dlgForm input[name="favRow"][value="last"]').checked = true;
+  $("ngName").value = "";
+  dlgColor = null;
   renderSwatches();
+  if (isFav) fillGroupSelect(v.group); else { $("fGroup").value = ""; showNewGroup(); }
   $("dlgFine").textContent = fine || "";
   dlgSave = onSave;
   $("dlg").showModal();
@@ -409,13 +785,25 @@ function normalUrl(u){
 }
 // Cancel is type="button" so that Enter in a field saves rather than cancels.
 $("dlgCancel").addEventListener("click", function(){ $("dlg").close("cancel"); });
-$("dlg").addEventListener("close", function(){
-  if ($("dlg").returnValue !== "ok" || !dlgSave) return;
+// Saved on the form's SUBMIT, not the dialog's `close` event. Chrome delivers
+// `close` only when the page next draws: in a pane that was not drawing
+// (2026-09-27, zero animation frames) Save closed the dialog and saved
+// nothing, silently. Submit fires at once -- and only for Save (Cancel and
+// Escape close without submitting) -- and a bad address now keeps the dialog
+// open instead of closing it and losing what was typed.
+$("dlgForm").addEventListener("submit", function(e){
+  if (!dlgSave) return;
   var url = normalUrl($("fUrl").value);
-  if (!url) { alert("That address doesn't look like a web address."); return; }
+  if (!url) { e.preventDefault(); alert("That address doesn't look like a web address."); $("fUrl").focus(); return; }
   // The name as typed, possibly empty: favorites fall back to the address's
-  // host, a new feed to the feed's own title.
-  dlgSave($("fName").value.trim(), url, $("fShort").value.trim() || null, dlgColor);
+  // host, a new feed to the feed's own title. The group choice: null (none),
+  // {id} (an existing group) or {name, color} (a group to create first).
+  var gv = $("fGroup").value;
+  var group = gv === "new" ? {name: $("ngName").value.trim().slice(0, 40), color: dlgColor}
+            : gv ? {id: +gv} : null;
+  var rowChoice = document.querySelector('#dlgForm input[name="favRow"]:checked').value;   // "last" | "new"
+  var save = dlgSave; dlgSave = null;               // once per opening
+  save($("fName").value.trim(), url, $("fShort").value.trim() || null, group, rowChoice);
 });
 
 // ---------------------------------------------------------------- saving favorites (R015)
@@ -423,17 +811,37 @@ $("dlg").addEventListener("close", function(){
 // failures in `error` rather than throwing, and a rule that refuses an update
 // or delete answers with ZERO rows rather than an error -- so both are checked.
 // On any failure the page says so and reloads what is actually saved.
-var FAV_COLS = "id,title,short_name,url,color,position";
+// `color` is no longer read (R023: the colour is the group's), so dropping the
+// column later (R026) cannot break this page.
+var FAV_COLS = "id,title,short_name,url,group_id,row_no,position,group_pos";
+var GROUP_COLS = "id,name,color,position";
+// `_row`/`_pos` remember the saved place, so a drag writes only what moved.
 function favFromRow(r){
-  return {id: r.id, title: r.title, short: r.short_name, url: r.url, color: r.color, position: r.position};
+  return {id: r.id, title: r.title, short: r.short_name, url: r.url,
+          group: r.group_id, row: r.row_no, position: r.position, gpos: r.group_pos,
+          _row: r.row_no, _pos: r.position, _group: r.group_id, _gpos: r.group_pos};
 }
 function check(r){ if (r.error) throw r.error; return r; }
 function oneRow(r){ check(r); if (!r.data || !r.data.length) throw new Error("nothing was saved"); return r; }
+function queryFavs(){ return sb.from("favorites").select(FAV_COLS).order("row_no").order("position"); }
+function queryGroups(){ return sb.from("fav_groups").select(GROUP_COLS).order("position"); }
 function reloadFavs(){
-  return sb.from("favorites").select(FAV_COLS).order("position").then(check).then(function(r){
-    state.favorites = r.data.map(favFromRow); renderFavs();
+  return Promise.all([queryFavs(), queryGroups()]).then(function(r){
+    check(r[0]); check(r[1]);
+    state.favorites = r[0].data.map(favFromRow);
+    state.groups = r[1].data;
+    renderFavs();
+    if ($("setDlg").open) renderGroupList();
   });
 }
+// Freeform order: row, then place in the row (R021).
+function sortFavs(){ state.favorites.sort(function(a, b){ return a.row - b.row || a.position - b.position || a.id - b.id; }); }
+function sortGroups(){ state.groups.sort(function(a, b){ return a.position - b.position || a.id - b.id; }); }
+function groupOf(f){ return f.group ? byId(state.groups, f.group) : null; }
+// Where a new favorite goes: the end of the last row, and the end of its group.
+function lastRow(){ return state.favorites.reduce(function(m, f){ return Math.max(m, f.row); }, 0); }
+function endOfRow(row){ return state.favorites.reduce(function(m, f){ return f.row === row ? Math.max(m, f.position + 1) : m; }, 0); }
+function endOfGroup(gid){ return state.favorites.reduce(function(m, f){ return f.group === gid ? Math.max(m, f.gpos + 1) : m; }, 0); }
 function favSaved(){
   var s = $("favStatus"); s.className = "feed-state"; s.textContent = "Saved";
   setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
@@ -443,16 +851,155 @@ function favFailed(err){
   s.textContent = "Couldn't save: " + (err && err.message ? err.message : err) + " — showing what is saved.";
   reloadFavs().catch(function(){});
 }
+
+// ---------------------------------------------------------------- groups (R023)
+// A group has a name, a colour and a place in the group order. Every change
+// saves as it is made; a failure reloads favorites and groups together.
+function addGroup(name, color){
+  var pos = state.groups.reduce(function(m, g){ return Math.max(m, g.position + 1); }, 0);
+  return sb.from("fav_groups").insert({name: name, color: color || null, position: pos}).select(GROUP_COLS)
+    .then(oneRow).then(function(r){ var g = r.data[0]; state.groups.push(g); return g; });
+}
+// A dialog's group choice -> a group id (creating the group first if asked).
+function resolveGroup(choice){
+  if (!choice) return Promise.resolve(null);
+  if (choice.id) return Promise.resolve(choice.id);
+  return addGroup(choice.name, choice.color).then(function(g){ return g.id; });
+}
+function saveGroup(g, patch){
+  return sb.from("fav_groups").update(patch).eq("id", g.id).select("id").then(oneRow);
+}
+function renderGroupList(){
+  sortGroups();
+  var counts = {};
+  state.favorites.forEach(function(f){ if (f.group) counts[f.group] = (counts[f.group] || 0) + 1; });
+  $("groupList").innerHTML = state.groups.length ? state.groups.map(function(g, i){
+    var n = counts[g.id] || 0;
+    return '<div class="grp" data-gid="' + g.id + '"><div class="grp-line">' +
+        '<input class="grp-name" value="' + esc(g.name) + '" maxlength="40" aria-label="Group name">' +
+        '<span class="grp-count">' + n + ' fav' + (n === 1 ? '' : 's') + '</span>' +
+        '<button type="button" class="icon-btn" data-grp="up" aria-label="Move ' + esc(g.name) + ' up"' + (i ? '' : ' disabled') + '>↑</button>' +
+        '<button type="button" class="icon-btn" data-grp="down" aria-label="Move ' + esc(g.name) + ' down"' + (i < state.groups.length - 1 ? '' : ' disabled') + '>↓</button>' +
+        '<button type="button" class="icon-btn del" data-grp="del" aria-label="Delete group ' + esc(g.name) + '">✕</button>' +
+      '</div><div class="swatches small">' + swatchesHtml(g.color, "data-gpick") + '</div></div>';
+  }).join("") : '<p class="fine">No groups yet. Make one here, or from a favorite\'s Group choice.</p>';
+}
+function groupFromEl(el){ return byId(state.groups, el.closest(".grp").dataset.gid); }
+$("groupList").addEventListener("click", function(e){
+  var pick = e.target.closest("[data-gpick]"), b = e.target.closest("[data-grp]");
+  if (pick) {
+    var g = groupFromEl(pick);
+    g.color = pick.dataset.gpick || null;
+    renderGroupList(); renderFavs();
+    saveGroup(g, {color: g.color}).then(favSaved).catch(favFailed);
+  } else if (b && b.dataset.grp === "del") {
+    deleteGroup(groupFromEl(b));
+  } else if (b) {
+    moveGroup(groupFromEl(b), b.dataset.grp === "up" ? -1 : 1);
+  }
+});
+// Rename on change (Enter or leaving the box); an empty name puts the old one back.
+$("groupList").addEventListener("change", function(e){
+  if (!e.target.classList.contains("grp-name")) return;
+  var g = groupFromEl(e.target), v = e.target.value.trim().slice(0, 40);
+  if (!v) { e.target.value = g.name; return; }
+  if (v === g.name) return;
+  g.name = v; e.target.value = v;
+  // The list is not redrawn (that would lose the cursor), so relabel its buttons.
+  var row = e.target.closest(".grp");
+  row.querySelector('[data-grp="up"]').setAttribute("aria-label", "Move " + v + " up");
+  row.querySelector('[data-grp="down"]').setAttribute("aria-label", "Move " + v + " down");
+  row.querySelector('[data-grp="del"]').setAttribute("aria-label", "Delete group " + v);
+  renderFavs();
+  saveGroup(g, {name: v}).then(favSaved).catch(favFailed);
+});
+// Enter in a name box must not submit (and so close) the Settings dialog.
+$("groupList").addEventListener("keydown", function(e){
+  if (e.key === "Enter" && e.target.classList.contains("grp-name")) { e.preventDefault(); e.target.blur(); }
+});
+function moveGroup(g, dir){
+  sortGroups();
+  var i = state.groups.indexOf(g), j = i + dir;
+  if (j < 0 || j >= state.groups.length) return;
+  state.groups[i] = state.groups[j]; state.groups[j] = g;
+  var changed = [];
+  state.groups.forEach(function(x, k){ if (x.position !== k) { x.position = k; changed.push(x); } });
+  renderGroupList(); renderFavs();
+  Promise.all(changed.map(function(x){ return saveGroup(x, {position: x.position}); })).then(favSaved).catch(favFailed);
+}
+function deleteGroup(g){
+  var n = state.favorites.filter(function(f){ return f.group === g.id; }).length;
+  if (!confirm('Delete the group "' + g.name + '"?' +
+      (n ? " Its " + n + " favorite" + (n === 1 ? " stays" : "s stay") + ", without a group." : ""))) return;
+  sb.from("fav_groups").delete().eq("id", g.id).select("id").then(oneRow).then(function(){
+    state.groups = state.groups.filter(function(x){ return x !== g; });
+    // The database did the same (on delete set null); mirror it rather than re-read.
+    state.favorites.forEach(function(f){ if (f.group === g.id) f.group = null; });
+    renderGroupList(); renderFavs(); favSaved();
+  }).catch(favFailed);
+}
+$("grpAdd").addEventListener("click", function(){
+  addGroup("New group", null).then(function(g){
+    renderGroupList(); favSaved();
+    var input = document.querySelector('.grp[data-gid="' + g.id + '"] .grp-name');
+    if (input) { input.focus(); input.select(); }
+  }).catch(favFailed);
+});
+
+// ---------------------------------------------------------------- settings (R022)
+// One row (`settings`); each choice is written as it is made. Only the column
+// that changed is sent, so the upsert never overwrites the others.
+var SETTINGS_COLS = "columns,fav_label,fav_layout";
+function applySettings(row){
+  state.columns   = row ? row.columns : 2;
+  state.favLabel  = row ? row.fav_label : "name_url";
+  state.favLayout = row ? row.fav_layout : "rows";
+}
+function reloadSettings(){
+  return sb.from("settings").select(SETTINGS_COLS).maybeSingle().then(check).then(function(r){
+    applySettings(r.data); render();
+  });
+}
+function saveSetting(patch){
+  patch.id = true;
+  sb.from("settings").upsert(patch).select("id").then(oneRow).then(favSaved).catch(function(err){
+    var s = $("favStatus"); s.className = "feed-state err";
+    s.textContent = "Couldn't save the setting: " + (err && err.message ? err.message : err) + " — showing what is saved.";
+    reloadSettings().catch(function(){});
+  });
+}
+function openSettings(){
+  document.querySelectorAll('#setForm input[name="favLabel"]').forEach(function(i){ i.checked = i.value === state.favLabel; });
+  document.querySelectorAll('#setForm input[name="favLayout"]').forEach(function(i){ i.checked = i.value === state.favLayout; });
+  renderGroupList();
+  mvFrom = currentTab;                              // "Move feeds" starts on the tab being looked at
+  showPanel(setPanel);                              // reopens on the part last used
+  $("setDlg").showModal();
+}
+$("setForm").addEventListener("change", function(e){
+  if (e.target.name === "favLabel") {
+    state.favLabel = e.target.value;
+    renderFavs();                                   // seen behind the dialog at once
+    saveSetting({fav_label: state.favLabel});
+  } else if (e.target.name === "favLayout") {       // R025
+    state.favLayout = e.target.value;
+    renderFavs();
+    saveSetting({fav_layout: state.favLayout});
+  }
+});
+
 // ---------------------------------------------------------------- saving feeds (R016)
 // Same discipline as favorites: error AND zero rows are failures; on failure
 // say so and reload what is saved. `_col`/`_pos` remember the saved place, so
 // only feeds that actually moved are written.
-var FEED_COLS = "id,title,url,site_url,col,position,headline_count";
+var FEED_COLS = "id,title,url,site_url,col,position,headline_count,tab_id";
 var STALE_DAYS = 30;                          // tools/check_feeds.py's rule
+// `col`/`pos` are the place within the feed's own tab (R031).
 function feedFromRow(f){
-  return {id: f.id, title: f.title, url: f.url, site: f.site_url || f.url,
+  return {id: f.id, title: f.title, url: f.url, site: f.site_url || f.url, tab: f.tab_id,
           col: f.col, pos: f.position, count: f.headline_count, _col: f.col, _pos: f.position};
 }
+function queryTabs(){ return sb.from("feed_tabs").select("id,name,position").order("position"); }
 function feedSaved(){
   var s = $("feedStatus"); s.className = "feed-state"; s.textContent = "Saved";
   setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
@@ -460,12 +1007,15 @@ function feedSaved(){
 function reloadFeeds(){
   return Promise.all([
     sb.from("feeds").select(FEED_COLS).order("col").order("position"),
-    sb.from("settings").select("columns").maybeSingle()
+    sb.from("settings").select("columns").maybeSingle(),
+    queryTabs()
   ]).then(function(r){
-    check(r[0]); check(r[1]);
+    check(r[0]); check(r[1]); check(r[2]);
     state.feeds = r[0].data.map(feedFromRow);
     state.columns = r[1].data ? r[1].data.columns : 2;
+    state.tabs = r[2].data;
     renderFeeds();
+    if ($("setDlg").open && setPanel === "feeds") { renderTabList(); renderMover(); }
   });
 }
 function feedFailed(err){
@@ -506,10 +1056,14 @@ function addFeed(name, address){
     else if (ageDays !== null && ageDays > STALE_DAYS)
       msg += "\n\n⚠ Its newest headline is " + Math.round(ageDays) + " days old — it looks frozen, as four of igHome's were.";
     s.textContent = "";
-    if (!confirm(msg + "\n\nAdd it?")) return;
-    var pos = state.feeds.reduce(function(m, x){ return x.col === 0 ? Math.max(m, x.pos + 1) : m; }, 0);
+    // Into the open tab (R032) -- or, from "Unassigned", the first tab -- at the
+    // bottom of that tab's first column.
+    var tab = currentTab !== "none" ? currentTab : (tabList()[0] || {}).id;
+    if (tab === "none") tab = null;
+    if (!confirm(msg + (tab ? '\n\nAdd it to the "' + byId(state.tabs, tab).name + '" tab?' : "\n\nAdd it?"))) return;
+    var pos = state.feeds.reduce(function(m, x){ return x.col === 0 && x.tab === tab ? Math.max(m, x.pos + 1) : m; }, 0);
     return sb.from("feeds").insert({title: (name || found.title).slice(0, 200), url: found.feed_url,
-        site_url: found.site_url || null, col: 0, position: pos, headline_count: 6})
+        site_url: found.site_url || null, col: 0, position: pos, headline_count: 6, tab_id: tab || null})
       .select(FEED_COLS).then(oneRow).then(function(ins){
         state.feeds.push(feedFromRow(ins.data[0]));
         renderFeeds(); feedSaved();
@@ -521,12 +1075,17 @@ function addFeed(name, address){
   });
 }
 
+// After a drag: freeform moves change row/place; by-group moves change
+// group/place-in-group (a drop on another group's row moves it into that group).
 function saveFavOrder(){
-  var changed = [];
-  state.favorites.forEach(function(f, i){ if (f.position !== i) { f.position = i; changed.push(f); } });
+  var changed = state.favorites.filter(function(f){
+    return f.row !== f._row || f.position !== f._pos || f.group !== f._group || f.gpos !== f._gpos;
+  });
   if (!changed.length) return;
   Promise.all(changed.map(function(f){
-    return sb.from("favorites").update({position: f.position}).eq("id", f.id).select("id").then(oneRow);
+    return sb.from("favorites").update({row_no: f.row, position: f.position, group_id: f.group, group_pos: f.gpos})
+      .eq("id", f.id).select("id").then(oneRow)
+      .then(function(){ f._row = f.row; f._pos = f.position; f._group = f.group; f._gpos = f.gpos; });
   })).then(favSaved).catch(favFailed);
 }
 
@@ -544,20 +1103,31 @@ document.addEventListener("click", function(e){
   var id = b.dataset.id, f;
   switch (b.dataset.action) {
     case "add-fav":
-      openDialog("Add favorite", {}, "", function(t, u, s, c){
-        // New favorites go at the end (ruled with R015's go).
-        var pos = state.favorites.reduce(function(m, x){ return Math.max(m, x.position + 1); }, 0);
-        sb.from("favorites").insert({title: t || host(u), short_name: s, url: u, color: c, position: pos}).select(FAV_COLS)
-          .then(oneRow).then(function(r){ state.favorites.push(favFromRow(r.data[0])); renderFavs(); favSaved(); })
-          .catch(favFailed);
+      // Arranged by group, a new favorite simply joins the end of its group,
+      // so "Put it on" is not asked (it still lands at the end of the last freeform row).
+      openDialog("Add favorite", {askRow: state.favLayout !== "groups"}, "", function(t, u, s, gc, rowChoice){
+        // New favorites go at the end (ruled with R015's go): of the last row --
+        // or alone on a new row below it (R024) -- and of their group.
+        resolveGroup(gc).then(function(gid){
+          var row = !state.favorites.length ? 0 : lastRow() + (rowChoice === "new" ? 1 : 0);
+          return sb.from("favorites").insert({title: t || host(u), short_name: s, url: u, group_id: gid,
+              row_no: row, position: endOfRow(row), group_pos: endOfGroup(gid)}).select(FAV_COLS)
+            .then(oneRow).then(function(r){ state.favorites.push(favFromRow(r.data[0])); renderFavs(); favSaved(); });
+        }).catch(favFailed);
       }, true);
+      break;
+    case "settings":
+      openSettings();
       break;
     case "edit-fav":
       f = byId(state.favorites, id);
-      openDialog("Edit favorite", {name: f.title, url: f.url, short: f.short, color: f.color}, "", function(t, u, s, c){
-        sb.from("favorites").update({title: t || host(u), short_name: s, url: u, color: c}).eq("id", f.id).select(FAV_COLS)
-          .then(oneRow).then(function(r){ Object.assign(f, favFromRow(r.data[0])); renderFavs(); favSaved(); })
-          .catch(favFailed);
+      openDialog("Edit favorite", {name: f.title, url: f.url, short: f.short, group: f.group}, "", function(t, u, s, gc){
+        resolveGroup(gc).then(function(gid){
+          var patch = {title: t || host(u), short_name: s, url: u, group_id: gid};
+          if (gid !== f.group) patch.group_pos = endOfGroup(gid);        // joins the end of its new group
+          return sb.from("favorites").update(patch).eq("id", f.id).select(FAV_COLS)
+            .then(oneRow).then(function(r){ Object.assign(f, favFromRow(r.data[0])); renderFavs(); favSaved(); });
+        }).catch(favFailed);
       }, true);
       break;
     case "del-fav":
@@ -589,10 +1159,13 @@ document.addEventListener("click", function(e){
       var n = +b.dataset.n;
       if (n === state.columns) break;
       state.columns = n;
-      // Going from 3 to 2: the third column's feeds join the end of the second.
-      var last = n - 1, maxPos = 0;
-      state.feeds.forEach(function(x){ if (x.col === last) maxPos = Math.max(maxPos, x.pos + 1); });
-      state.feeds.forEach(function(x){ if (x.col > last) { x.col = last; x.pos = maxPos++; } });
+      // Going from 3 to 2: in every tab, the third column's feeds join the end
+      // of that tab's second column (the setting applies to all tabs, R032).
+      var last = n - 1, endOf = {};
+      state.feeds.forEach(function(x){ if (x.col === last) endOf[x.tab] = Math.max(endOf[x.tab] || 0, x.pos + 1); });
+      state.feeds.forEach(function(x){
+        if (x.col > last) { x.col = last; x.pos = endOf[x.tab] || 0; endOf[x.tab] = x.pos + 1; }
+      });
       renderFeeds();
       sb.from("settings").upsert({id: true, columns: n}).select("id").then(oneRow)
         .then(saveFeedOrder).then(feedSaved).catch(feedFailed);
@@ -682,10 +1255,26 @@ function finishDrag(commit){
 
 // The DOM order after a drop is the new order; copy it back into the state.
 function syncOrder(kind){
-  if (kind === "fav") {
-    var ids = Array.prototype.map.call(document.querySelectorAll('#favGrid [data-drag="fav"]'),
-      function(n){ return +n.dataset.id; });
-    state.favorites.sort(function(a, b){ return ids.indexOf(a.id) - ids.indexOf(b.id); });
+  if (kind === "fav" && state.favLayout === "groups") {
+    // Each zone is a group ("" = no group); order within it is the group order.
+    document.querySelectorAll('#favGrid [data-zone="fav"]').forEach(function(zone){
+      var gid = zone.dataset.group ? +zone.dataset.group : null;
+      Array.prototype.forEach.call(zone.querySelectorAll('[data-drag="fav"]'), function(n, pos){
+        var f = byId(state.favorites, n.dataset.id); f.group = gid; f.gpos = pos;
+      });
+    });
+  } else if (kind === "fav") {
+    // Rows are renumbered 0, 1, 2... in screen order; a row left empty is
+    // skipped, so it disappears. The "+ New row" strip, if dropped on, is last.
+    var r = 0;
+    document.querySelectorAll('#favGrid [data-zone="fav"]').forEach(function(zone){
+      var items = zone.querySelectorAll('[data-drag="fav"]');
+      if (!items.length) return;
+      Array.prototype.forEach.call(items, function(n, pos){
+        var f = byId(state.favorites, n.dataset.id); f.row = r; f.position = pos;
+      });
+      r++;
+    });
   } else {
     document.querySelectorAll('#cols [data-zone="feed"]').forEach(function(zone){
       var col = +zone.dataset.col;
@@ -710,11 +1299,11 @@ window.addEventListener("pageshow", recheckCols);
 // ---------------------------------------------------------------- signed in / out
 function showSignedOut(){
   userId = null;
-  state = {columns: 2, favorites: [], feeds: []};
+  state = emptyState();
   cache = {};
   $("feedStatus").textContent = "";
   if (editing) $("editBtn").click();
-  $("editBtn").hidden = true;
+  $("editBtn").hidden = $("addBtn").hidden = $("setBtn").hidden = true;
   $("mine").hidden = true;
   $("loadMsg").hidden = true;
   $("buildNote").hidden = true;
@@ -733,23 +1322,28 @@ function load(){
   var msg = $("loadMsg");
   msg.className = "note"; msg.textContent = "Loading your page…"; msg.hidden = false;
   Promise.all([
-    sb.from("favorites").select(FAV_COLS).order("position"),
-    sb.from("feeds").select("id,title,url,site_url,col,position,headline_count").order("col").order("position"),
-    sb.from("settings").select("columns").maybeSingle(),
-    sb.from("feed_cache").select("feed_id,items,fetched_at,checked_at,last_error,last_error_at")
+    queryFavs(),
+    sb.from("feeds").select(FEED_COLS).order("col").order("position"),
+    sb.from("settings").select(SETTINGS_COLS).maybeSingle(),
+    sb.from("feed_cache").select("feed_id,items,fetched_at,checked_at,last_error,last_error_at"),
+    queryGroups(),
+    queryTabs()
   ]).then(function(r){
-    var err = r[0].error || r[1].error || r[2].error || r[3].error;
+    var err = r[0].error || r[1].error || r[2].error || r[3].error || r[4].error || r[5].error;
     if (err) throw err;
     cache = {};
     r[3].data.forEach(function(row){ cache[row.feed_id] = row; });
     state.favorites = r[0].data.map(favFromRow);
+    state.groups = r[4].data;
     state.feeds = r[1].data.map(feedFromRow);
-    state.columns = r[2].data ? r[2].data.columns : 2;
+    state.tabs = r[5].data;
+    chooseTab();
+    applySettings(r[2].data);
     msg.hidden = true;
     // An empty answer is not a failed one (R17): say which it is.
     $("emptyMsg").hidden = state.favorites.length + state.feeds.length > 0;
     $("buildNote").hidden = false;
-    $("editBtn").hidden = false;
+    $("editBtn").hidden = $("addBtn").hidden = $("setBtn").hidden = false;
     $("mine").hidden = false;
     render();
     lastVis = visibleCols();
