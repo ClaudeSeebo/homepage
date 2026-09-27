@@ -284,8 +284,13 @@ function byId(list, id){ id = +id; return list.find(function(x){ return x.id ===
 
 // Ruled R007 f: one setting (2 or 3); narrow screens drop columns -- iPad
 // upright 2, phone 1 -- stacked in column order.
+// The LAYOUT width, not window.innerWidth. On iPad Safari innerWidth reports
+// the zoomed, visible width -- a pinch-zoom or the tab-switch animation made it
+// read narrow, and the page dropped to one column and stayed there (seen on
+// Seebo's iPad 2026-09-26; fixed from Code-CB dot com, homepage register R020).
+function layoutWidth(){ return document.documentElement.clientWidth || window.innerWidth; }
 function visibleCols(){
-  var w = window.innerWidth;
+  var w = layoutWidth();
   var max = w < 640 ? 1 : (w < 1024 ? 2 : 3);
   return Math.min(state.columns, max);
 }
@@ -691,12 +696,16 @@ function syncOrder(kind){
   }
 }
 
-var lastVis = 0;
-window.addEventListener("resize", function(){
+var lastVis = 0, resizeTimer = null;
+function recheckCols(){
   if (drag) return;
   var v = visibleCols();
   if (v !== lastVis) { lastVis = v; renderFeeds(); }
-});
+}
+// After a resize has settled, and whenever the tab comes back into view.
+window.addEventListener("resize", function(){ clearTimeout(resizeTimer); resizeTimer = setTimeout(recheckCols, 250); });
+document.addEventListener("visibilitychange", function(){ if (!document.hidden) recheckCols(); });
+window.addEventListener("pageshow", recheckCols);
 
 // ---------------------------------------------------------------- signed in / out
 function showSignedOut(){
