@@ -98,7 +98,12 @@
   .additem{display:flex;gap:8px;margin-top:11px;}
   .additem input{font-size:15px;padding:10px 12px;}
   .additem button{background:var(--accent-soft);color:#a6541b;font-weight:600;padding:10px 14px;white-space:nowrap;}
-  .catfoot{display:flex;gap:8px;margin-top:11px;}
+  .catfoot{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap;align-items:center;}
+  /* reorder lists (R004): wraps onto its own line on a phone rather than overflow */
+  .ordgrp{display:flex;gap:4px;}
+  @media (max-width:520px){ .ordgrp{flex-basis:100%;} }  /* own line on a phone; the
+     other buttons keep theirs, right-aligned, instead of Delete list wrapping alone */
+  .btn-ghost.ord{padding:5px 0;min-width:36px;font-size:15px;line-height:1.2;}
   .catfoot .spacer{flex:1 1 auto;}
   .empty{color:var(--muted);font-size:14.5px;font-style:italic;padding:9px 0 2px;}
   .nothing{text-align:center;color:var(--muted);padding:46px 20px;font-size:15px;}
@@ -1067,6 +1072,21 @@ function render(){
     }
 
     var foot=document.createElement('div'); foot.className='catfoot';
+    /* Reorder LISTS (R004, 2026-09-27). Lists only, on purpose: every item row
+       already carries four buttons, and long text is what this app exists for (P2). */
+    if(LISTS.length>1){
+      var at=LISTS.indexOf(cat), og=document.createElement('span'); og.className='ordgrp';
+      [['top','⤒','Move list to the top'],['up','↑','Move list up'],['down','↓','Move list down']]
+        .forEach(function(o){
+          var x=document.createElement('button'); x.className='btn-ghost ord';
+          x.textContent=o[1]; x.title=o[2]; x.setAttribute('aria-label',o[2]);
+          x.setAttribute('data-dir',o[0]);
+          x.disabled = o[0]==='down' ? at===LISTS.length-1 : at===0;
+          x.addEventListener('click',function(){ moveList(cat,o[0]); });
+          og.appendChild(x);
+        });
+      foot.appendChild(og);
+    }
     var sp=document.createElement('span'); sp.className='spacer';
     foot.appendChild(sp);
     if(items.length>1){
@@ -1232,6 +1252,35 @@ function clearDone(cat){
   var chosen=live(cat).filter(function(i){ return i.done; });
   if(!chosen.length){ setSync('ok','nothing ticked to archive'); return; }
   archiveItems(chosen, null, false);
+}
+/* A move gives the list a position BETWEEN its new neighbours, so it costs one
+   update. If there is no room between them (they tie, or halving has run out of
+   precision) every list is renumbered instead, so a move never silently fails to
+   happen. */
+function moveList(cat, dir){
+  var i=LISTS.indexOf(cat); if(i<0) return;
+  var j = dir==='top' ? 0 : dir==='up' ? i-1 : i+1;
+  if(j<0 || j>=LISTS.length || j===i) return;
+  var order=LISTS.filter(function(l){ return l!==cat; });
+  order.splice(j,0,cat);
+  var before=order[j-1], after=order[j+1], pos, changed;
+  if(!before) pos=after.position-1;
+  else if(!after) pos=before.position+1;
+  else pos=(before.position+after.position)/2;
+  if((before && !(pos>before.position)) || (after && !(pos<after.position))){
+    changed=order.map(function(l,k){ l.position=k+1; return l; });
+  } else { cat.position=pos; changed=[cat]; }
+  LISTS=order; openSet[cat.id]=true; render();
+  var el=elCats.children[j]; if(el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+  work(Promise.all(changed.map(function(l){
+      return sb.from('lists').update({position:l.position}).eq('id',l.id);
+    })).then(function(rs){
+      var bad=rs.filter(function(r){ return r && r.error; });
+      if(bad.length) throw bad[0].error;
+      return {};
+    }), 'moving list')
+    .then(function(){ setSync('ok', cat.name+' moved '+(dir==='top'?'to the top':dir)); })
+    .catch(function(e){ fail(e,'Could not move that list'); });
 }
 function deleteList(cat){
   LISTS=LISTS.filter(function(l){return l.id!==cat.id;}); render();
