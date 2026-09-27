@@ -268,8 +268,11 @@
     <button class="btn-primary full" id="gGo">Sign in</button>
     <div class="preview" id="gMsg"></div>
     <p class="gswap">No account? Accounts are added by invitation.</p>
-    <p class="gfoot" id="gFoot">Forgot your password? Reset it from the Supabase
-       dashboard under Authentication → Users.</p>
+    <!-- Until 2026-09-27 this said "Reset it from the Supabase dashboard under
+         Authentication -> Users". Measured broken that day: the project's Site URL
+         is http://localhost:3000, so the recovery email lands nowhere. Reset is
+         deferred until Seebo's own domain sends the email (register R011). -->
+    <p class="gfoot" id="gFoot">Forgot your password? Password reset isn't available&nbsp;yet.</p>
   </div>
 </div>
 
