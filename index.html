@@ -19,7 +19,8 @@
   setting to arrange favorites by group instead (R025). Then feed tabs
   (R031-R036): tabs under the favorites (R032), managed in Settings (R033).
   Coming back into view re-reads everything quietly (R029); a load refused
-  with "JWT issued at future" is retried once (R037).
+  with "JWT issued at future" is retried once (R037). The fetcher re-reads
+  only the open tab's feeds, on load and on each tab click (R034, fetcher v4).
   Published by Code-CB dot com as index.html (R005/R018) -- never from this project.
 -->
 <style>
@@ -543,7 +544,8 @@ $("tabs").addEventListener("click", function(e){
   if (!b) return;
   currentTab = b.dataset.tab === "none" ? "none" : +b.dataset.tab;
   try { localStorage.setItem(TAB_KEY, String(currentTab)); } catch (err) {}
-  renderFeeds();
+  renderFeeds();                                  // stored copies at once...
+  if (userId) refresh();                          // ...then this tab's stale feeds re-read (R034)
 });
 
 // ---------------------------------------------------------------- Settings -> Feeds & tabs (R033)
@@ -1069,7 +1071,7 @@ function addFeed(name, address){
       .select(FEED_COLS).then(oneRow).then(function(ins){
         state.feeds.push(feedFromRow(ins.data[0]));
         renderFeeds(); feedSaved();
-        refresh();                            // read it now: it has no stored copy yet
+        refresh([ins.data[0].id]);            // read it now: it has no stored copy yet
       });
   }).catch(function(err){
     s.className = "feed-state err";
@@ -1393,21 +1395,30 @@ function comeBack(){
   load({quiet: true});
 }
 
-// Stored copies are already on screen; now ask the fetcher to re-read any feed
-// older than 10 minutes (R007 h) and redraw with what it returns.
-function refresh(){
-  if (!state.feeds.length) return;
-  var st = $("feedStatus");
+// Stored copies are already on screen; now ask the fetcher to re-read the
+// open tab's feeds older than 10 minutes (R007 h) and redraw with what it
+// returns (R034: only the open tab -- 180 feeds took 6.6 s all at once).
+// `ids` names other feeds instead: a feed just added. The answer is merged,
+// so the other tabs keep their copies. Tabs clicked quickly can leave an
+// older answer arriving late: it is merged too, but only the newest request
+// speaks in the status line.
+var refreshSeq = 0;
+function refresh(ids){
+  ids = ids || feedsInTab().map(function(f){ return f.id; });
+  if (!ids.length) return;
+  var st = $("feedStatus"), seq = ++refreshSeq;
   refreshing = true; st.textContent = "Refreshing…"; st.className = "feed-state";
-  sb.functions.invoke("homepage-feeds", {body: {}}).then(function(r){
-    refreshing = false;
+  sb.functions.invoke("homepage-feeds", {body: {feeds: ids}}).then(function(r){
     if (r.error) throw r.error;
-    cache = {};
     (r.data.cache || []).forEach(function(row){ cache[row.feed_id] = row; });
-    var failed = (r.data.refreshed || []).filter(function(x){ return !x.ok; }).length;
-    st.textContent = failed ? failed + " feed" + (failed > 1 ? "s" : "") + " couldn't be read just now" : "";
+    if (seq === refreshSeq) {
+      refreshing = false;
+      var failed = (r.data.refreshed || []).filter(function(x){ return !x.ok; }).length;
+      st.textContent = failed ? failed + " feed" + (failed > 1 ? "s" : "") + " couldn't be read just now" : "";
+    }
     renderFeeds();
   }).catch(function(e){
+    if (seq !== refreshSeq) return;
     refreshing = false;
     st.className = "feed-state err";
     st.textContent = "Couldn't refresh: " + (e && e.message ? e.message : e) + " — showing stored copies.";
