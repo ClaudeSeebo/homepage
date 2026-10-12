@@ -72,8 +72,18 @@ body.editing .edit-only{display:revert}
 /* Favorites come in rows (R024): each row is its own grid with the same
    columns, so a new row starts on a new line however full the last one is;
    a long row still wraps on a narrow screen. */
-.fav-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:26px}
-.fav-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+/* Button size (R039), kept in this browser only: one of five heights (3 is the
+   page as it was) and, optionally, at most N per row -- fewer on a narrow
+   screen, never under 100px wide. Unset, a row fits as many 150px+ as it can. */
+.fav-grid{--fav-gap:8px;--fav-h:42px;--fav-pad:8px 12px;--fav-font:1rem}
+.fav-grid[data-size="1"]{--fav-gap:4px;--fav-h:28px;--fav-pad:3px 8px;--fav-font:.875rem}
+.fav-grid[data-size="2"]{--fav-gap:6px;--fav-h:34px;--fav-pad:5px 10px;--fav-font:.9375rem}
+.fav-grid[data-size="4"]{--fav-h:50px;--fav-pad:10px 14px}
+.fav-grid[data-size="5"]{--fav-gap:10px;--fav-h:58px;--fav-pad:12px 16px}
+.fav-grid{display:flex;flex-direction:column;gap:var(--fav-gap);margin-bottom:26px}
+.fav-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--fav-gap)}
+.fav-grid[data-per-row] .fav-row{grid-template-columns:repeat(auto-fill,
+  minmax(max(100px,calc((100% - (var(--per-row) - 1) * var(--fav-gap)) / var(--per-row))),1fr))}
 body.editing .fav-grid{gap:14px}
 body.editing .fav-row{outline:1px dashed var(--line);outline-offset:4px;border-radius:12px}
 .fav-row.new-row{display:none}
@@ -90,8 +100,8 @@ body.editing .fav-row.empty-zone{display:grid;min-height:48px;align-items:center
 body.editing .fav-grid.by-group{gap:24px;padding-top:12px}
 body.editing .fav-grid.by-group .fav-row[data-label]::before{content:attr(data-label);position:absolute;top:-19px;left:10px;
   font-size:.72rem;line-height:1.2;color:var(--muted);background:var(--bg);padding:0 4px}
-.fav{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:56px;
-  padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);
+.fav{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:calc(var(--fav-h) + 14px);
+  padding:var(--fav-pad);font-size:var(--fav-font);border:1px solid var(--line);border-radius:12px;background:var(--card);
   text-decoration:none;box-shadow:var(--shadow);overflow:hidden}
 .fav:hover,.fav:focus-visible{border-color:var(--accent);outline:none}
 .fav b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -101,7 +111,7 @@ body.editing .fav .tools{display:flex}
 body.editing .fav[data-drag]{padding-right:64px}  /* room for the ✎ ✕ so they never cover the name */
 .fav .tools{display:none}
 /* Setting "name only" (R022): no address line, and a shorter tile. */
-.fav-grid.name-only .fav{min-height:42px}
+.fav-grid.name-only .fav{min-height:var(--fav-h)}
 .fav-grid.name-only .fav small.addr{display:none}
 /* In Edit mode the second line shows the favorite's group, not its address (R023). */
 .fav small.grp{display:none}
@@ -189,6 +199,9 @@ dialog select{width:100%;padding:8px 10px;border:1px solid var(--line);border-ra
 .tabrow:first-child{border-top:0}
 dialog .tabrow input{flex:1;width:auto;min-width:0;padding:6px 8px}
 dialog label.inline{display:block;margin:6px 0 4px}
+dialog .size-pick{display:flex;gap:12px;margin-top:4px}
+dialog .size-pick label{flex:1;font-size:.85rem;color:var(--muted)}
+dialog .size-pick select{margin-top:2px}
 #mvList{margin-top:8px;max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .mvrow{display:flex;align-items:center;gap:8px;padding:5px 8px;border-top:1px solid var(--line)}
 .mvrow:first-child{border-top:0}
@@ -359,6 +372,22 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
       <label class="radio"><input type="radio" name="favLayout" value="groups"> By group — a row for each group, in the order below</label>
     </fieldset>
     <fieldset>
+      <legend>Button size <span class="opt">— on this device only</span></legend>
+      <div class="size-pick">
+        <label>Per row
+          <select id="favPerRow">
+            <option value="">As many as fit</option>
+            <option value="6">Up to 6</option><option value="7">Up to 7</option><option value="8">Up to 8</option>
+            <option value="9">Up to 9</option><option value="10">Up to 10</option>
+          </select></label>
+        <label>Height
+          <select id="favSize">
+            <option value="1">Smallest</option><option value="2">Small</option><option value="3">Normal</option>
+            <option value="4">Large</option><option value="5">Largest</option>
+          </select></label>
+      </div>
+    </fieldset>
+    <fieldset>
       <legend>Groups <span class="opt">— a group's colour is used by all its favorites</span></legend>
       <div id="groupList"></div>
       <button type="button" class="small-btn" id="grpAdd">+ New group</button>
@@ -469,6 +498,7 @@ function renderFavs(){
   // Add and Settings live beside Edit at the top (moved there at R025's
   // check), so every row here holds favorites only.
   $("favGrid").classList.toggle("name-only", state.favLabel === "name");
+  applyFavSize();                                   // this device's button size (R039)
   var byGroup = state.favLayout === "groups";
   $("favGrid").classList.toggle("by-group", byGroup);
   var zones = byGroup ? groupZones() : rowZones();
@@ -950,6 +980,27 @@ $("grpAdd").addEventListener("click", function(){
   }).catch(favFailed);
 });
 
+// ---------------------------------------------------------------- button size (R039)
+// Per device, so it is kept in this browser, not in `settings` (Seebo
+// 2026-10-12: the PC and the phone want different sizes). Unset = the page as
+// it was: as many per row as fit, Normal height. Storage that fails or holds
+// anything else is read as unset.
+var PER_ROW_KEY = "homepage-fav-per-row", SIZE_KEY = "homepage-fav-size";
+var favPerRow = "", favSize = "3";
+function readLocal(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+function writeLocal(k, v){ try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} }
+(function(){
+  var n = readLocal(PER_ROW_KEY), s = readLocal(SIZE_KEY);
+  if (/^(6|7|8|9|10)$/.test(n || "")) favPerRow = n;
+  if (/^[1-5]$/.test(s || "")) favSize = s;
+})();
+function applyFavSize(){
+  var g = $("favGrid");
+  g.dataset.size = favSize;
+  if (favPerRow) { g.dataset.perRow = favPerRow; g.style.setProperty("--per-row", favPerRow); }
+  else { delete g.dataset.perRow; g.style.removeProperty("--per-row"); }
+}
+
 // ---------------------------------------------------------------- settings (R022)
 // One row (`settings`); each choice is written as it is made. Only the column
 // that changed is sent, so the upsert never overwrites the others.
@@ -975,6 +1026,8 @@ function saveSetting(patch){
 function openSettings(){
   document.querySelectorAll('#setForm input[name="favLabel"]').forEach(function(i){ i.checked = i.value === state.favLabel; });
   document.querySelectorAll('#setForm input[name="favLayout"]').forEach(function(i){ i.checked = i.value === state.favLayout; });
+  $("favPerRow").value = favPerRow;
+  $("favSize").value = favSize;
   renderGroupList();
   mvFrom = currentTab;                              // "Move feeds" starts on the tab being looked at
   showPanel(setPanel);                              // reopens on the part last used
@@ -989,6 +1042,14 @@ $("setForm").addEventListener("change", function(e){
     state.favLayout = e.target.value;
     renderFavs();
     saveSetting({fav_layout: state.favLayout});
+  } else if (e.target.id === "favPerRow") {         // R039: this browser only
+    favPerRow = e.target.value;
+    writeLocal(PER_ROW_KEY, favPerRow);
+    applyFavSize();
+  } else if (e.target.id === "favSize") {
+    favSize = e.target.value;
+    writeLocal(SIZE_KEY, favSize === "3" ? "" : favSize);
+    applyFavSize();
   }
 });
 
