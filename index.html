@@ -69,21 +69,33 @@ body.editing .edit-only{display:revert}
 
 /* ---- favorites -------------------------------------------------------- */
 .sec-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 8px}
+/* Button size and shape (R039, R040), kept in this browser only: one of five
+   heights (3 is the page as it was); at most N per row -- fewer on a narrow
+   screen, never under 100px wide -- or each button as wide as its name; and
+   one of Material Design 3's seven corner shapes (md, 12px, as it was). */
+.fav-grid{--fav-gap:8px;--fav-h:42px;--fav-pad-y:8px;--fav-pad-x:12px;--fav-font:1rem;--fav-radius:12px}
+.fav-grid[data-size="1"]{--fav-gap:4px;--fav-h:28px;--fav-pad-y:3px;--fav-pad-x:8px;--fav-font:.875rem}
+.fav-grid[data-size="2"]{--fav-gap:6px;--fav-h:34px;--fav-pad-y:5px;--fav-pad-x:10px;--fav-font:.9375rem}
+.fav-grid[data-size="4"]{--fav-h:50px;--fav-pad-y:10px;--fav-pad-x:14px}
+.fav-grid[data-size="5"]{--fav-gap:10px;--fav-h:58px;--fav-pad-y:12px;--fav-pad-x:16px}
+.fav-grid[data-shape="none"]{--fav-radius:0}
+.fav-grid[data-shape="xs"]{--fav-radius:4px}
+.fav-grid[data-shape="sm"]{--fav-radius:8px}
+.fav-grid[data-shape="lg"]{--fav-radius:16px}
+.fav-grid[data-shape="xl"]{--fav-radius:28px}
+.fav-grid[data-shape="full"]{--fav-radius:999px;--fav-pad-end:4px}   /* a pill: text kept off the round ends */
+.fav-grid{display:flex;flex-direction:column;gap:var(--fav-gap);margin-bottom:26px}
 /* Favorites come in rows (R024): each row is its own grid with the same
    columns, so a new row starts on a new line however full the last one is;
    a long row still wraps on a narrow screen. */
-/* Button size (R039), kept in this browser only: one of five heights (3 is the
-   page as it was) and, optionally, at most N per row -- fewer on a narrow
-   screen, never under 100px wide. Unset, a row fits as many 150px+ as it can. */
-.fav-grid{--fav-gap:8px;--fav-h:42px;--fav-pad:8px 12px;--fav-font:1rem}
-.fav-grid[data-size="1"]{--fav-gap:4px;--fav-h:28px;--fav-pad:3px 8px;--fav-font:.875rem}
-.fav-grid[data-size="2"]{--fav-gap:6px;--fav-h:34px;--fav-pad:5px 10px;--fav-font:.9375rem}
-.fav-grid[data-size="4"]{--fav-h:50px;--fav-pad:10px 14px}
-.fav-grid[data-size="5"]{--fav-gap:10px;--fav-h:58px;--fav-pad:12px 16px}
-.fav-grid{display:flex;flex-direction:column;gap:var(--fav-gap);margin-bottom:26px}
 .fav-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--fav-gap)}
-.fav-grid[data-per-row] .fav-row{grid-template-columns:repeat(auto-fill,
+.fav-grid[data-per-row]:not([data-per-row="fit"]) .fav-row{grid-template-columns:repeat(auto-fill,
   minmax(max(100px,calc((100% - (var(--per-row) - 1) * var(--fav-gap)) / var(--per-row))),1fr))}
+/* Fit to name (R040): a wrapping line of buttons each as wide as its name,
+   from twice the height up to 240px. Not the Edit-mode drop zones (new row,
+   empty group), which keep their own display rules. */
+.fav-grid[data-per-row="fit"] .fav-row:not(.new-row):not(.empty-zone){display:flex;flex-wrap:wrap}
+.fav-grid[data-per-row="fit"] .fav{min-width:calc(var(--fav-h) * 2);max-width:240px}
 body.editing .fav-grid{gap:14px}
 body.editing .fav-row{outline:1px dashed var(--line);outline-offset:4px;border-radius:12px}
 .fav-row.new-row{display:none}
@@ -101,7 +113,8 @@ body.editing .fav-grid.by-group{gap:24px;padding-top:12px}
 body.editing .fav-grid.by-group .fav-row[data-label]::before{content:attr(data-label);position:absolute;top:-19px;left:10px;
   font-size:.72rem;line-height:1.2;color:var(--muted);background:var(--bg);padding:0 4px}
 .fav{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:calc(var(--fav-h) + 14px);
-  padding:var(--fav-pad);font-size:var(--fav-font);border:1px solid var(--line);border-radius:12px;background:var(--card);
+  padding:var(--fav-pad-y) calc(var(--fav-pad-x) + var(--fav-pad-end,0px));font-size:var(--fav-font);border:1px solid var(--line);
+  border-radius:var(--fav-radius);background:var(--card);
   text-decoration:none;box-shadow:var(--shadow);overflow:hidden}
 .fav:hover,.fav:focus-visible{border-color:var(--accent);outline:none}
 .fav b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -165,6 +178,7 @@ body.editing .feed .tools{display:flex}
 body.editing [data-drag]{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 .dragging{opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:grabbing!important}
 .ph{border:2px dashed var(--accent);border-radius:12px;background:transparent}
+.fav-grid .ph{border-radius:var(--fav-radius)}
 
 /* ---- dialog ----------------------------------------------------------- */
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);
@@ -199,8 +213,8 @@ dialog select{width:100%;padding:8px 10px;border:1px solid var(--line);border-ra
 .tabrow:first-child{border-top:0}
 dialog .tabrow input{flex:1;width:auto;min-width:0;padding:6px 8px}
 dialog label.inline{display:block;margin:6px 0 4px}
-dialog .size-pick{display:flex;gap:12px;margin-top:4px}
-dialog .size-pick label{flex:1;font-size:.85rem;color:var(--muted)}
+dialog .size-pick{display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:4px}
+dialog .size-pick label{flex:1 1 120px;font-size:.85rem;color:var(--muted)}
 dialog .size-pick select{margin-top:2px}
 #mvList{margin-top:8px;max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .mvrow{display:flex;align-items:center;gap:8px;padding:5px 8px;border-top:1px solid var(--line)}
@@ -372,18 +386,25 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
       <label class="radio"><input type="radio" name="favLayout" value="groups"> By group — a row for each group, in the order below</label>
     </fieldset>
     <fieldset>
-      <legend>Button size <span class="opt">— on this device only</span></legend>
+      <legend>Buttons <span class="opt">— on this device only</span></legend>
       <div class="size-pick">
         <label>Per row
           <select id="favPerRow">
             <option value="">As many as fit</option>
             <option value="6">Up to 6</option><option value="7">Up to 7</option><option value="8">Up to 8</option>
             <option value="9">Up to 9</option><option value="10">Up to 10</option>
+            <option value="fit">Fit to name</option>
           </select></label>
         <label>Height
           <select id="favSize">
             <option value="1">Smallest</option><option value="2">Small</option><option value="3">Normal</option>
             <option value="4">Large</option><option value="5">Largest</option>
+          </select></label>
+        <label>Corners
+          <select id="favShape">
+            <option value="none">None (square)</option><option value="xs">Extra small</option><option value="sm">Small</option>
+            <option value="md">Medium</option><option value="lg">Large</option><option value="xl">Extra large</option>
+            <option value="full">Full (pill)</option>
           </select></label>
       </div>
     </fieldset>
@@ -980,25 +1001,30 @@ $("grpAdd").addEventListener("click", function(){
   }).catch(favFailed);
 });
 
-// ---------------------------------------------------------------- button size (R039)
+// ---------------------------------------------------------------- button size and shape (R039, R040)
 // Per device, so it is kept in this browser, not in `settings` (Seebo
 // 2026-10-12: the PC and the phone want different sizes). Unset = the page as
-// it was: as many per row as fit, Normal height. Storage that fails or holds
-// anything else is read as unset.
-var PER_ROW_KEY = "homepage-fav-per-row", SIZE_KEY = "homepage-fav-size";
-var favPerRow = "", favSize = "3";
+// it was: as many per row as fit, Normal height, Medium corners. Storage that
+// fails or holds anything else is read as unset.
+// Per row: "", 6-10, or "fit" (each button as wide as its name, R040).
+// Corners: Material Design 3's shape scale, by its own names (R040).
+var PER_ROW_KEY = "homepage-fav-per-row", SIZE_KEY = "homepage-fav-size", SHAPE_KEY = "homepage-fav-shape";
+var SHAPES = ["none", "xs", "sm", "md", "lg", "xl", "full"];
+var favPerRow = "", favSize = "3", favShape = "md";
 function readLocal(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
 function writeLocal(k, v){ try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} }
 (function(){
-  var n = readLocal(PER_ROW_KEY), s = readLocal(SIZE_KEY);
-  if (/^(6|7|8|9|10)$/.test(n || "")) favPerRow = n;
+  var n = readLocal(PER_ROW_KEY), s = readLocal(SIZE_KEY), c = readLocal(SHAPE_KEY);
+  if (/^(6|7|8|9|10|fit)$/.test(n || "")) favPerRow = n;
   if (/^[1-5]$/.test(s || "")) favSize = s;
+  if (SHAPES.indexOf(c) >= 0) favShape = c;
 })();
 function applyFavSize(){
   var g = $("favGrid");
   g.dataset.size = favSize;
-  if (favPerRow) { g.dataset.perRow = favPerRow; g.style.setProperty("--per-row", favPerRow); }
-  else { delete g.dataset.perRow; g.style.removeProperty("--per-row"); }
+  g.dataset.shape = favShape;
+  if (favPerRow) g.dataset.perRow = favPerRow; else delete g.dataset.perRow;
+  if (/^\d+$/.test(favPerRow)) g.style.setProperty("--per-row", favPerRow); else g.style.removeProperty("--per-row");
 }
 
 // ---------------------------------------------------------------- settings (R022)
@@ -1028,6 +1054,7 @@ function openSettings(){
   document.querySelectorAll('#setForm input[name="favLayout"]').forEach(function(i){ i.checked = i.value === state.favLayout; });
   $("favPerRow").value = favPerRow;
   $("favSize").value = favSize;
+  $("favShape").value = favShape;
   renderGroupList();
   mvFrom = currentTab;                              // "Move feeds" starts on the tab being looked at
   showPanel(setPanel);                              // reopens on the part last used
@@ -1049,6 +1076,10 @@ $("setForm").addEventListener("change", function(e){
   } else if (e.target.id === "favSize") {
     favSize = e.target.value;
     writeLocal(SIZE_KEY, favSize === "3" ? "" : favSize);
+    applyFavSize();
+  } else if (e.target.id === "favShape") {          // R040
+    favShape = e.target.value;
+    writeLocal(SHAPE_KEY, favShape === "md" ? "" : favShape);
     applyFavSize();
   }
 });
@@ -1276,6 +1307,9 @@ function startDrag(){
   var ph = document.createElement("div");
   ph.className = "ph";
   ph.style.height = r.height + "px";
+  // Fit to name (R040): a row of content-wide buttons gives the gap no width
+  // of its own, so it keeps the dragged button's.
+  if (drag.kind === "fav" && favPerRow === "fit") ph.style.width = r.width + "px";
   el.parentNode.insertBefore(ph, el);
   el.classList.add("dragging");
   Object.assign(el.style, {position: "fixed", left: r.left + "px", top: r.top + "px",
