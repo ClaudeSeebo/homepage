@@ -21,7 +21,12 @@
   Coming back into view re-reads everything quietly (R029); a load refused
   with "JWT issued at future" is retried once (R037). The fetcher re-reads
   only the open tab's feeds, on load and on each tab click (R034, fetcher v4).
-  Published by Code-CB dot com as index.html (R005/R018) -- never from this project.
+  2026-10-24, Research (R042 piece 1): PDFs in a private bucket
+  (`homepage-research`), listed under the favorites in their own groups; a
+  paper's button is `?paper=<id>`, which -- signed in -- opens the file by a
+  link that expires in 5 minutes. Size and corners apply to both sections.
+  Published as index.html with Code-CB dot com's script (R005/R018); from this
+  project, on Seebo's word, since 2026-10-11 (cb-dot-com R021, R038 here).
 -->
 <style>
 :root{
@@ -131,6 +136,10 @@ body.editing .fav[data-drag]{padding-right:64px}  /* room for the ✎ ✕ so the
 body.editing .fav small.grp{display:block}
 body.editing .fav small.addr{display:none}
 .fav small.grp.none{font-style:italic}
+/* Research (R042): the same buttons, size and corners as the favorites; always
+   arranged by group. */
+#paperGrid:empty{display:none}
+dialog input[type="file"]{padding:6px;background:var(--card)}
 
 /* ---- feeds ------------------------------------------------------------ */
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -280,6 +289,7 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
          so the favorite rows start clean at the left. -->
     <span class="top-actions">
       <button class="top-btn" id="addBtn" data-action="add-fav" hidden>+ Add favorite</button>
+      <button class="top-btn" id="addPaperBtn" data-action="add-paper" hidden>+ Add research</button>
       <button class="top-btn" id="setBtn" data-action="settings" hidden>⚙&#xFE0E; Settings</button>
       <button class="top-btn edit-toggle" id="editBtn" aria-pressed="false" hidden>Edit</button>
     </span>
@@ -306,6 +316,13 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
   <section aria-labelledby="favH">
     <div class="sec-head"><h2 id="favH">Favorites</h2><span class="feed-state" id="favStatus" role="status"></span></div>
     <div class="fav-grid" id="favGrid" data-zone="fav"></div>
+  </section>
+
+  <!-- Research (R042): under the favorites, in its own groups. -->
+  <section aria-labelledby="paperH">
+    <div class="sec-head"><h2 id="paperH">Research</h2><span class="feed-state" id="paperStatus" role="status"></span></div>
+    <div class="fav-grid by-group" id="paperGrid" data-zone="paper"></div>
+    <p class="note" id="paperEmpty" hidden>No papers yet — add a PDF with + Add research at the top.</p>
   </section>
 
   <section aria-labelledby="feedH">
@@ -352,8 +369,15 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
         <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
       </div>
     </div>
-    <label for="fUrl">Address</label>
-    <input id="fUrl" inputmode="url" autocomplete="off" placeholder="https://…">
+    <div id="urlRow">
+      <label for="fUrl">Address</label>
+      <input id="fUrl" inputmode="url" autocomplete="off" placeholder="https://…">
+    </div>
+    <!-- Adding a paper only (R042): a PDF of at most 25 MB. -->
+    <div id="fileRow" hidden>
+      <label for="fFile">PDF <span class="opt">(at most 25 MB)</span></label>
+      <input type="file" id="fFile" accept="application/pdf,.pdf">
+    </div>
     <!-- Adding only (R024, ruled: both ways — here, and dragging onto "+ New row"). -->
     <fieldset id="rowRow">
       <legend>Put it on</legend>
@@ -372,11 +396,12 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
     <!-- Two parts so it stays short (R033): favorites, and feeds & tabs. -->
     <div class="set-switch" role="tablist" aria-label="Settings sections">
       <button type="button" role="tab" data-panel="fav" aria-selected="true">Favorites</button>
+      <button type="button" role="tab" data-panel="research" aria-selected="false">Research</button>
       <button type="button" role="tab" data-panel="feeds" aria-selected="false">Feeds &amp; tabs</button>
     </div>
     <div data-panel-body="fav">
     <fieldset>
-      <legend>Favorites show</legend>
+      <legend>Favorites and research show</legend>
       <label class="radio"><input type="radio" name="favLabel" value="name_url"> Name and address</label>
       <label class="radio"><input type="radio" name="favLabel" value="name"> Name only</label>
     </fieldset>
@@ -386,7 +411,7 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
       <label class="radio"><input type="radio" name="favLayout" value="groups"> By group — a row for each group, in the order below</label>
     </fieldset>
     <fieldset>
-      <legend>Buttons <span class="opt">— on this device only</span></legend>
+      <legend>Buttons <span class="opt">— favorites and research, on this device only</span></legend>
       <div class="size-pick">
         <label>Per row
           <select id="favPerRow">
@@ -414,6 +439,19 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
       <button type="button" class="small-btn" id="grpAdd">+ New group</button>
     </fieldset>
     <p class="fine">Changes save as you make them. Deleting a group keeps its favorites, without a group.</p>
+    </div>
+    <div data-panel-body="research" hidden>
+    <fieldset>
+      <legend>Research groups <span class="opt">— a group's colour is used by all its papers</span></legend>
+      <div id="paperGroupList"></div>
+      <button type="button" class="small-btn" id="pgrpAdd">+ New group</button>
+    </fieldset>
+    <fieldset>
+      <legend>Storage</legend>
+      <p class="fine" id="storageMeter" style="margin:4px 0 0"></p>
+    </fieldset>
+    <p class="fine">Changes save as you make them. Deleting a group keeps its papers, without a group. Button size
+      and corners are under Favorites and apply here too.</p>
     </div>
     <div data-panel-body="feeds" hidden>
     <fieldset>
@@ -458,7 +496,9 @@ var sb = null, userId = null;
 
 // Filled from the database once signed in; empty until then.
 // favLabel / favLayout: the settings row's fav_label / fav_layout (R021).
-function emptyState(){ return {columns: 2, favLabel: "name_url", favLayout: "rows", favorites: [], groups: [], feeds: [], tabs: []}; }
+// papers / pgroups: research papers and their own groups (R042).
+function emptyState(){ return {columns: 2, favLabel: "name_url", favLayout: "rows", favorites: [], groups: [], feeds: [], tabs: [],
+                               papers: [], pgroups: []}; }
 var state = emptyState();
 var editing = false;
 var MIN_COUNT = 1, MAX_COUNT = 20;
@@ -505,7 +545,7 @@ function renderQuick(){
 function favTile(f){
   // The short name, if set, is what the button shows; the full name on hover (R015).
   // The colour is the group's (R023); a favorite's own old `color` is no longer used.
-  var g = groupOf(f);
+  var g = groupOf(f, "fav");
   var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
   return '<a class="fav"' + colour + ' data-drag="fav" data-id="' + f.id + '" href="' + esc(f.url) + '" title="' + esc(f.title) + '">' +
     '<b>' + esc(f.short || f.title) + '</b><small class="addr">' + esc(host(f.url)) + '</small>' +
@@ -522,15 +562,42 @@ function renderFavs(){
   applyFavSize();                                   // this device's button size (R039)
   var byGroup = state.favLayout === "groups";
   $("favGrid").classList.toggle("by-group", byGroup);
-  var zones = byGroup ? groupZones() : rowZones();
-  $("favGrid").innerHTML = zones.map(function(z){
-    return '<div class="fav-row' + (z.favs.length ? '' : ' empty-zone') + '" data-zone="fav"' + (z.attrs || '') +
-        (z.label ? ' data-label="' + esc(z.label) + '"' : '') + '>' +
-        (z.favs.length ? z.favs.map(favTile).join("") : (z.hint ? '<span class="new-row-hint">' + esc(z.hint) + '</span>' : '')) +
-      '</div>';
-  }).join("") + (byGroup ? '' :
+  var zones = byGroup ? groupZones("fav") : rowZones();
+  $("favGrid").innerHTML = zones.map(zoneHtml("fav", favTile)).join("") + (byGroup ? '' :
     '<div class="fav-row new-row" data-zone="fav"><span class="new-row-hint">+ New row — drop a favorite here</span></div>');
 }
+// One row of buttons: a drop zone for its kind ("fav" or "paper"), labelled
+// with its group in Edit mode; an empty one shows its hint.
+function zoneHtml(k, tile){
+  return function(z){
+    return '<div class="fav-row' + (z.favs.length ? '' : ' empty-zone') + '" data-zone="' + k + '"' + (z.attrs || '') +
+        (z.label ? ' data-label="' + esc(z.label) + '"' : '') + '>' +
+        (z.favs.length ? z.favs.map(tile).join("") : (z.hint ? '<span class="new-row-hint">' + esc(z.hint) + '</span>' : '')) +
+      '</div>';
+  };
+}
+// Research (R042): always by group; the same buttons as favorites, opening the
+// paper through `?paper=<id>` (openPaper). The second line is its size.
+function paperTile(p){
+  var g = groupOf(p, "paper");
+  var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
+  return '<a class="fav"' + colour + ' data-drag="paper" data-id="' + p.id + '" href="?paper=' + p.id + '" title="' + esc(p.title) + '">' +
+    '<b>' + esc(p.short || p.title) + '</b><small class="addr">PDF · ' + esc(sizeText(p.size)) + '</small>' +
+    '<small class="grp' + (g ? '' : ' none') + '">' + esc(g ? g.name : "No group") + '</small>' +
+    '<span class="tools">' +
+      '<button class="icon-btn" data-action="edit-paper" data-id="' + p.id + '" aria-label="Edit ' + esc(p.title) + '">✎</button>' +
+      '<button class="icon-btn del" data-action="del-paper" data-id="' + p.id + '" aria-label="Delete ' + esc(p.title) + '">✕</button>' +
+    '</span></a>';
+}
+function renderPapers(){
+  var grid = $("paperGrid");
+  grid.classList.toggle("name-only", state.favLabel === "name");
+  applyFavSize();
+  // With no papers at all there is nothing to drop on, so no zones -- just the note.
+  grid.innerHTML = state.papers.length || state.pgroups.length ? groupZones("paper").map(zoneHtml("paper", paperTile)).join("") : "";
+  $("paperEmpty").hidden = state.papers.length > 0;
+}
+function sizeText(n){ return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB"; }
 // Freeform rows (R024): one drop zone per row, in row order (gaps in the
 // numbers are harmless); "+ New row" follows, seen only in Edit mode.
 function rowZones(){
@@ -544,18 +611,20 @@ function rowZones(){
 }
 // By group (R025): one zone per group in group order, then "No group". The
 // freeform arrangement is left untouched, so switching back restores it.
-function groupZones(){
-  sortGroups();
+// `k` is the kind: favorites, or research papers (R042), which have no rows.
+function groupZones(k){
+  var K = KIND[k], groups = K.groups();
+  sortGroups(groups);
   var lists = {};
-  state.favorites.forEach(function(f){ (lists[f.group || 0] = lists[f.group || 0] || []).push(f); });
-  Object.keys(lists).forEach(function(k){
-    lists[k].sort(function(a, b){ return a.gpos - b.gpos || a.row - b.row || a.position - b.position || a.id - b.id; });
+  K.items().forEach(function(f){ (lists[f.group || 0] = lists[f.group || 0] || []).push(f); });
+  Object.keys(lists).forEach(function(g){
+    lists[g].sort(function(a, b){ return a.gpos - b.gpos || (a.row || 0) - (b.row || 0) || (a.position || 0) - (b.position || 0) || a.id - b.id; });
   });
-  return state.groups.map(function(g){
+  return groups.map(function(g){
     return {favs: lists[g.id] || [], attrs: ' data-group="' + g.id + '"', label: g.name,
-            hint: g.name + " is empty — drop a favorite here to add it"};
+            hint: g.name + " is empty — drop a " + K.word + " here to add it"};
   }).concat([{favs: lists[0] || [], attrs: ' data-group=""', label: "No group",
-              hint: "Drop a favorite here to take it out of its group"}]);
+              hint: "Drop a " + K.word + " here to take it out of its group"}]);
 }
 
 // ---------------------------------------------------------------- feed tabs (R032)
@@ -615,6 +684,7 @@ function showPanel(p){
   document.querySelectorAll(".set-switch [data-panel]").forEach(function(b){ b.setAttribute("aria-selected", String(b.dataset.panel === p)); });
   document.querySelectorAll("[data-panel-body]").forEach(function(d){ d.hidden = d.dataset.panelBody !== p; });
   if (p === "feeds") { renderTabList(); renderMover(); }
+  if (p === "research") { renderGroupList("paper"); renderMeter(); }
 }
 function tabCount(id){ return state.feeds.filter(function(f){ return f.tab === id; }).length; }
 function saveTabRow(t, patch){ return sb.from("feed_tabs").update(patch).eq("id", t.id).select("id").then(oneRow); }
@@ -763,7 +833,7 @@ function renderFeeds(){
   });
 }
 
-function render(){ renderFavs(); renderFeeds(); }
+function render(){ renderFavs(); renderPapers(); renderFeeds(); }
 
 // ---------------------------------------------------------------- edit switch
 $("editBtn").addEventListener("click", function(){
@@ -795,9 +865,10 @@ $("swatches").addEventListener("click", function(e){
 // The group choice: "No group", each group in order, or "+ New group…",
 // which opens a name and colour. The name is required only while it shows
 // (a hidden required field would block Save with nothing to see).
-function fillGroupSelect(selectedId){
-  sortGroups();
-  $("fGroup").innerHTML = '<option value="">No group</option>' + state.groups.map(function(g){
+function fillGroupSelect(k, selectedId){
+  var groups = KIND[k].groups();
+  sortGroups(groups);
+  $("fGroup").innerHTML = '<option value="">No group</option>' + groups.map(function(g){
     return '<option value="' + g.id + '">' + esc(g.name) + '</option>';
   }).join("") + '<option value="new">+ New group…</option>';
   $("fGroup").value = selectedId ? String(selectedId) : "";
@@ -812,26 +883,39 @@ $("fGroup").addEventListener("change", function(){
   showNewGroup();
   if ($("fGroup").value === "new") $("ngName").focus();
 });
-// v: {name, url, short, group, askRow}; isFav shows the short-name and group
-// fields; askRow (adding a favorite) shows "Put it on: last row / new row".
-function openDialog(title, v, fine, onSave, isFav){
+// v: {name, url, short, group, askRow, file}. `kind` "fav" or "paper" shows
+// the short-name and group fields (from that kind's groups); "paper" hides
+// the address, and v.file (adding a paper, R042) asks for the PDF. askRow
+// (adding a favorite) shows "Put it on: last row / new row".
+var dlgKind = null, dlgFile = false;
+function openDialog(title, v, fine, onSave, kind){
+  dlgKind = kind || null; dlgFile = !!v.file;
   $("dlgTitle").textContent = title;
   $("fName").value = v.name || "";
   $("fShort").value = v.short || "";
   $("fUrl").value = v.url || "";
-  $("shortRow").hidden = !isFav;
-  $("groupRow").hidden = !isFav;
+  $("fFile").value = "";
+  $("shortRow").hidden = !kind;
+  $("groupRow").hidden = !kind;
+  $("urlRow").hidden = kind === "paper";
+  $("fileRow").hidden = !dlgFile;
   $("rowRow").hidden = !v.askRow;
   document.querySelector('#dlgForm input[name="favRow"][value="last"]').checked = true;
   $("ngName").value = "";
   dlgColor = null;
   renderSwatches();
-  if (isFav) fillGroupSelect(v.group); else { $("fGroup").value = ""; showNewGroup(); }
+  if (kind) fillGroupSelect(kind, v.group); else { $("fGroup").value = ""; showNewGroup(); }
   $("dlgFine").textContent = fine || "";
   dlgSave = onSave;
   $("dlg").showModal();
-  $("fName").focus();
+  (dlgFile ? $("fFile") : $("fName")).focus();
 }
+// A chosen PDF names the paper, unless a name was already typed.
+$("fFile").addEventListener("change", function(){
+  var f = this.files[0];
+  if (f && !$("fName").value.trim()) $("fName").value = paperStem(f.name);
+});
+function paperStem(name){ return name.replace(/\.pdf$/i, "").replace(/[_]+/g, " ").trim().slice(0, 200) || "Untitled"; }
 function normalUrl(u){
   u = u.trim();
   if (!u) return null;
@@ -848,6 +932,22 @@ $("dlgCancel").addEventListener("click", function(){ $("dlg").close("cancel"); }
 // open instead of closing it and losing what was typed.
 $("dlgForm").addEventListener("submit", function(e){
   if (!dlgSave) return;
+  if (dlgKind === "paper") {                        // R042: a file, not an address
+    var file = null;
+    if (dlgFile) {
+      file = $("fFile").files[0];
+      var why = !file ? "Choose a PDF first."
+              : file.type && file.type !== "application/pdf" ? "That isn't a PDF."
+              : !file.size ? "That file is empty."
+              : file.size > MAX_PAPER ? "That file is over the 25 MB limit (" + file.size.toLocaleString() + " bytes)." : "";
+      if (why) { e.preventDefault(); alert(why); $("fFile").focus(); return; }
+    }
+    var pv = $("fGroup").value;
+    var pgroup = pv === "new" ? {name: $("ngName").value.trim().slice(0, 40), color: dlgColor} : pv ? {id: +pv} : null;
+    var psave = dlgSave; dlgSave = null;
+    psave($("fName").value.trim(), file, $("fShort").value.trim() || null, pgroup);
+    return;
+  }
   var url = normalUrl($("fUrl").value);
   if (!url) { e.preventDefault(); alert("That address doesn't look like a web address."); $("fUrl").focus(); return; }
   // The name as typed, possibly empty: favorites fall back to the address's
@@ -886,17 +986,17 @@ function reloadFavs(){
     state.favorites = r[0].data.map(favFromRow);
     state.groups = r[1].data;
     renderFavs();
-    if ($("setDlg").open) renderGroupList();
+    if ($("setDlg").open) renderGroupList("fav");
   });
 }
 // Freeform order: row, then place in the row (R021).
 function sortFavs(){ state.favorites.sort(function(a, b){ return a.row - b.row || a.position - b.position || a.id - b.id; }); }
-function sortGroups(){ state.groups.sort(function(a, b){ return a.position - b.position || a.id - b.id; }); }
-function groupOf(f){ return f.group ? byId(state.groups, f.group) : null; }
+function sortGroups(list){ list.sort(function(a, b){ return a.position - b.position || a.id - b.id; }); }
+function groupOf(f, k){ return f.group ? byId(KIND[k].groups(), f.group) : null; }
 // Where a new favorite goes: the end of the last row, and the end of its group.
 function lastRow(){ return state.favorites.reduce(function(m, f){ return Math.max(m, f.row); }, 0); }
 function endOfRow(row){ return state.favorites.reduce(function(m, f){ return f.row === row ? Math.max(m, f.position + 1) : m; }, 0); }
-function endOfGroup(gid){ return state.favorites.reduce(function(m, f){ return f.group === gid ? Math.max(m, f.gpos + 1) : m; }, 0); }
+function endOfGroup(gid, k){ return KIND[k].items().reduce(function(m, f){ return f.group === gid ? Math.max(m, f.gpos + 1) : m; }, 0); }
 function favSaved(){
   var s = $("favStatus"); s.className = "feed-state"; s.textContent = "Saved";
   setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
@@ -907,98 +1007,233 @@ function favFailed(err){
   reloadFavs().catch(function(){});
 }
 
-// ---------------------------------------------------------------- groups (R023)
+// ---------------------------------------------------------------- research papers (R042)
+// The file lives in the private bucket under a random name (`storage_key`, a
+// UUID: never a URL, so a later move to other storage changes no rows); the
+// row in `papers` is what the page lists. Upload first, then the row -- and if
+// the row is refused, the file is taken back down, so nothing is stored
+// unseen. Deleting removes the row, then the file.
+var BUCKET = "homepage-research", MAX_PAPER = 26214400;      // 25 MB, as the bucket and the table
+var PAPER_COLS = "id,title,short_name,storage_key,file_name,size_bytes,group_id,group_pos";
+function paperFromRow(r){
+  return {id: r.id, title: r.title, short: r.short_name, key: r.storage_key, file: r.file_name, size: r.size_bytes,
+          group: r.group_id, gpos: r.group_pos, _group: r.group_id, _gpos: r.group_pos};
+}
+function queryPapers(){ return sb.from("papers").select(PAPER_COLS).order("group_pos"); }
+function queryPaperGroups(){ return sb.from("paper_groups").select(GROUP_COLS).order("position"); }
+function reloadPapers(){
+  return Promise.all([queryPapers(), queryPaperGroups()]).then(function(r){
+    check(r[0]); check(r[1]);
+    state.papers = r[0].data.map(paperFromRow);
+    state.pgroups = r[1].data;
+    renderPapers();
+    if ($("setDlg").open) renderGroupList("paper");
+  });
+}
+function paperSaved(){
+  var s = $("paperStatus"); s.className = "feed-state"; s.textContent = "Saved";
+  setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
+}
+function paperFailed(err){
+  var s = $("paperStatus"); s.className = "feed-state err";
+  s.textContent = "Couldn't save: " + (err && err.message ? err.message : err) + " — showing what is saved.";
+  reloadPapers().catch(function(){});
+}
+// A real PDF starts "%PDF-"; the browser's file type comes only from the name.
+function isPdf(file){
+  return file.slice(0, 5).arrayBuffer().then(function(b){
+    return String.fromCharCode.apply(null, new Uint8Array(b)) === "%PDF-";
+  });
+}
+function addPaper(t, file, s, gc){
+  var st = $("paperStatus"), key = crypto.randomUUID() + ".pdf";
+  st.className = "feed-state"; st.textContent = "Uploading " + file.name + " (" + sizeText(file.size) + ")…";
+  isPdf(file).then(function(ok){
+    if (!ok) throw new Error("that file doesn't start like a PDF, so it was not uploaded");
+    return resolveGroup("paper", gc);
+  }).then(function(gid){
+    return sb.storage.from(BUCKET).upload(key, file, {contentType: "application/pdf", upsert: false}).then(check)
+      .then(function(){
+        return sb.from("papers").insert({title: t || paperStem(file.name), short_name: s, storage_key: key,
+            file_name: file.name.slice(0, 255), size_bytes: file.size, group_id: gid, group_pos: endOfGroup(gid, "paper")})
+          .select(PAPER_COLS).then(oneRow)
+          .catch(function(err){
+            return sb.storage.from(BUCKET).remove([key]).then(function(){ throw err; }, function(){ throw err; });
+          });
+      });
+  }).then(function(r){
+    state.papers.push(paperFromRow(r.data[0])); renderPapers(); paperSaved();
+  }).catch(paperFailed);
+}
+function deletePaper(p){
+  if (!confirm('Delete "' + p.title + '"? Its file is deleted too.')) return;
+  sb.from("papers").delete().eq("id", p.id).select("id").then(oneRow).then(function(){
+    state.papers = state.papers.filter(function(x){ return x !== p; }); renderPapers();
+    return sb.storage.from(BUCKET).remove([p.key]).then(function(r){
+      if (r.error || !r.data || !r.data.length)
+        throw new Error("the paper is off the list, but its file (" + p.key + ") was not deleted" +
+                        (r.error ? ": " + r.error.message : ""));
+      paperSaved();
+    });
+  }).catch(paperFailed);
+}
+function savePaperOrder(){
+  var changed = state.papers.filter(function(p){ return p.group !== p._group || p.gpos !== p._gpos; });
+  if (!changed.length) return;
+  Promise.all(changed.map(function(p){
+    return sb.from("papers").update({group_id: p.group, group_pos: p.gpos}).eq("id", p.id).select("id").then(oneRow)
+      .then(function(){ p._group = p.group; p._gpos = p.gpos; });
+  })).then(paperSaved).catch(paperFailed);
+}
+// Settings -> Research: what the bucket holds, asked of Storage itself (not
+// added up from the list), against the free plan's 1 GB for the whole project.
+function renderMeter(){
+  var el = $("storageMeter");
+  el.textContent = "Measuring…";
+  sb.storage.from(BUCKET).list("", {limit: 1000}).then(check).then(function(r){
+    var files = r.data.filter(function(o){ return o.id; });
+    var bytes = files.reduce(function(m, o){ return m + (o.metadata && o.metadata.size || 0); }, 0);
+    var text = "Research uses " + (bytes ? sizeText(bytes) : "nothing") + " in " + files.length + " file" + (files.length === 1 ? "" : "s") +
+      " — " + (bytes / 1073741824 * 100).toFixed(1) + "% of the project's 1 GB (the Supabase free plan; Todonut's photos share it).";
+    if (files.length !== state.papers.length)
+      text += " ⚠ " + files.length + " file" + (files.length === 1 ? "" : "s") + " but " + state.papers.length +
+              " paper" + (state.papers.length === 1 ? "" : "s") + " listed — something is stored without a button, or listed without a file.";
+    el.textContent = text;
+  }).catch(function(err){ el.textContent = "Couldn't measure: " + (err && err.message ? err.message : err); });
+}
+// `?paper=<id>`: this page opens that paper instead of itself (R042 ruling:
+// a lasting link on his domain that works only signed in). The file is
+// fetched by a signed link that expires in 5 minutes -- so the address the
+// browser then shows is Supabase's, and stops working soon after.
+var PAPER_ID = (location.search.match(/[?&]paper=(\d+)/) || [])[1] || null;
+function openPaper(){
+  var msg = $("loadMsg");
+  msg.className = "note"; msg.hidden = false; msg.textContent = "Opening the paper…";
+  sb.from("papers").select("title,storage_key").eq("id", +PAPER_ID).maybeSingle().then(check).then(function(r){
+    if (!r.data) throw new Error("it isn't in your list — it may have been deleted");
+    document.title = r.data.title;
+    return sb.storage.from(BUCKET).createSignedUrl(r.data.storage_key, 300).then(check).then(function(s){
+      location.replace(s.data.signedUrl);
+    });
+  }).catch(function(err){
+    msg.className = "note err";
+    msg.innerHTML = esc("Couldn't open the paper: " + (err && err.message ? err.message : err) + ". ") +
+                    '<a href="' + esc(location.pathname) + '">Go to your page</a>';
+  });
+}
+
+// ---------------------------------------------------------------- groups (R023; research R042)
 // A group has a name, a colour and a place in the group order. Every change
-// saves as it is made; a failure reloads favorites and groups together.
-function addGroup(name, color){
-  var pos = state.groups.reduce(function(m, g){ return Math.max(m, g.position + 1); }, 0);
-  return sb.from("fav_groups").insert({name: name, color: color || null, position: pos}).select(GROUP_COLS)
-    .then(oneRow).then(function(r){ var g = r.data[0]; state.groups.push(g); return g; });
+// saves as it is made; a failure reloads that kind's buttons and groups.
+// Favorites and research papers each have their own groups (separate tables,
+// R042 ruling), handled by this one code through KIND.
+var KIND = {
+  fav:   {groupTable: "fav_groups", listEl: "groupList", word: "favorite", short: "fav",
+          items: function(){ return state.favorites; }, groups: function(){ return state.groups; },
+          setGroups: function(list){ state.groups = list; },
+          render: function(){ renderFavs(); }, saved: function(){ favSaved(); }, failed: function(err){ favFailed(err); }},
+  paper: {groupTable: "paper_groups", listEl: "paperGroupList", word: "paper", short: "paper",
+          items: function(){ return state.papers; }, groups: function(){ return state.pgroups; },
+          setGroups: function(list){ state.pgroups = list; },
+          render: function(){ renderPapers(); }, saved: function(){ paperSaved(); }, failed: function(err){ paperFailed(err); }}
+};
+function addGroup(k, name, color){
+  var K = KIND[k], pos = K.groups().reduce(function(m, g){ return Math.max(m, g.position + 1); }, 0);
+  return sb.from(K.groupTable).insert({name: name, color: color || null, position: pos}).select(GROUP_COLS)
+    .then(oneRow).then(function(r){ var g = r.data[0]; K.groups().push(g); return g; });
 }
 // A dialog's group choice -> a group id (creating the group first if asked).
-function resolveGroup(choice){
+function resolveGroup(k, choice){
   if (!choice) return Promise.resolve(null);
   if (choice.id) return Promise.resolve(choice.id);
-  return addGroup(choice.name, choice.color).then(function(g){ return g.id; });
+  return addGroup(k, choice.name, choice.color).then(function(g){ return g.id; });
 }
-function saveGroup(g, patch){
-  return sb.from("fav_groups").update(patch).eq("id", g.id).select("id").then(oneRow);
+function saveGroup(k, g, patch){
+  return sb.from(KIND[k].groupTable).update(patch).eq("id", g.id).select("id").then(oneRow);
 }
-function renderGroupList(){
-  sortGroups();
+function renderGroupList(k){
+  var K = KIND[k], groups = K.groups();
+  sortGroups(groups);
   var counts = {};
-  state.favorites.forEach(function(f){ if (f.group) counts[f.group] = (counts[f.group] || 0) + 1; });
-  $("groupList").innerHTML = state.groups.length ? state.groups.map(function(g, i){
+  K.items().forEach(function(f){ if (f.group) counts[f.group] = (counts[f.group] || 0) + 1; });
+  $(K.listEl).innerHTML = groups.length ? groups.map(function(g, i){
     var n = counts[g.id] || 0;
     return '<div class="grp" data-gid="' + g.id + '"><div class="grp-line">' +
         '<input class="grp-name" value="' + esc(g.name) + '" maxlength="40" aria-label="Group name">' +
-        '<span class="grp-count">' + n + ' fav' + (n === 1 ? '' : 's') + '</span>' +
+        '<span class="grp-count">' + n + ' ' + K.short + (n === 1 ? '' : 's') + '</span>' +
         '<button type="button" class="icon-btn" data-grp="up" aria-label="Move ' + esc(g.name) + ' up"' + (i ? '' : ' disabled') + '>↑</button>' +
-        '<button type="button" class="icon-btn" data-grp="down" aria-label="Move ' + esc(g.name) + ' down"' + (i < state.groups.length - 1 ? '' : ' disabled') + '>↓</button>' +
+        '<button type="button" class="icon-btn" data-grp="down" aria-label="Move ' + esc(g.name) + ' down"' + (i < groups.length - 1 ? '' : ' disabled') + '>↓</button>' +
         '<button type="button" class="icon-btn del" data-grp="del" aria-label="Delete group ' + esc(g.name) + '">✕</button>' +
       '</div><div class="swatches small">' + swatchesHtml(g.color, "data-gpick") + '</div></div>';
-  }).join("") : '<p class="fine">No groups yet. Make one here, or from a favorite\'s Group choice.</p>';
+  }).join("") : '<p class="fine">No groups yet. Make one here, or from a ' + K.word + '\'s Group choice.</p>';
 }
-function groupFromEl(el){ return byId(state.groups, el.closest(".grp").dataset.gid); }
-$("groupList").addEventListener("click", function(e){
-  var pick = e.target.closest("[data-gpick]"), b = e.target.closest("[data-grp]");
-  if (pick) {
-    var g = groupFromEl(pick);
-    g.color = pick.dataset.gpick || null;
-    renderGroupList(); renderFavs();
-    saveGroup(g, {color: g.color}).then(favSaved).catch(favFailed);
-  } else if (b && b.dataset.grp === "del") {
-    deleteGroup(groupFromEl(b));
-  } else if (b) {
-    moveGroup(groupFromEl(b), b.dataset.grp === "up" ? -1 : 1);
-  }
+function groupFromEl(k, el){ return byId(KIND[k].groups(), el.closest(".grp").dataset.gid); }
+Object.keys(KIND).forEach(function(k){
+  var K = KIND[k], list = $(K.listEl);
+  list.addEventListener("click", function(e){
+    var pick = e.target.closest("[data-gpick]"), b = e.target.closest("[data-grp]");
+    if (pick) {
+      var g = groupFromEl(k, pick);
+      g.color = pick.dataset.gpick || null;
+      renderGroupList(k); K.render();
+      saveGroup(k, g, {color: g.color}).then(K.saved).catch(K.failed);
+    } else if (b && b.dataset.grp === "del") {
+      deleteGroup(k, groupFromEl(k, b));
+    } else if (b) {
+      moveGroup(k, groupFromEl(k, b), b.dataset.grp === "up" ? -1 : 1);
+    }
+  });
+  // Rename on change (Enter or leaving the box); an empty name puts the old one back.
+  list.addEventListener("change", function(e){
+    if (!e.target.classList.contains("grp-name")) return;
+    var g = groupFromEl(k, e.target), v = e.target.value.trim().slice(0, 40);
+    if (!v) { e.target.value = g.name; return; }
+    if (v === g.name) return;
+    g.name = v; e.target.value = v;
+    // The list is not redrawn (that would lose the cursor), so relabel its buttons.
+    var row = e.target.closest(".grp");
+    row.querySelector('[data-grp="up"]').setAttribute("aria-label", "Move " + v + " up");
+    row.querySelector('[data-grp="down"]').setAttribute("aria-label", "Move " + v + " down");
+    row.querySelector('[data-grp="del"]').setAttribute("aria-label", "Delete group " + v);
+    K.render();
+    saveGroup(k, g, {name: v}).then(K.saved).catch(K.failed);
+  });
+  // Enter in a name box must not submit (and so close) the Settings dialog.
+  list.addEventListener("keydown", function(e){
+    if (e.key === "Enter" && e.target.classList.contains("grp-name")) { e.preventDefault(); e.target.blur(); }
+  });
 });
-// Rename on change (Enter or leaving the box); an empty name puts the old one back.
-$("groupList").addEventListener("change", function(e){
-  if (!e.target.classList.contains("grp-name")) return;
-  var g = groupFromEl(e.target), v = e.target.value.trim().slice(0, 40);
-  if (!v) { e.target.value = g.name; return; }
-  if (v === g.name) return;
-  g.name = v; e.target.value = v;
-  // The list is not redrawn (that would lose the cursor), so relabel its buttons.
-  var row = e.target.closest(".grp");
-  row.querySelector('[data-grp="up"]').setAttribute("aria-label", "Move " + v + " up");
-  row.querySelector('[data-grp="down"]').setAttribute("aria-label", "Move " + v + " down");
-  row.querySelector('[data-grp="del"]').setAttribute("aria-label", "Delete group " + v);
-  renderFavs();
-  saveGroup(g, {name: v}).then(favSaved).catch(favFailed);
-});
-// Enter in a name box must not submit (and so close) the Settings dialog.
-$("groupList").addEventListener("keydown", function(e){
-  if (e.key === "Enter" && e.target.classList.contains("grp-name")) { e.preventDefault(); e.target.blur(); }
-});
-function moveGroup(g, dir){
-  sortGroups();
-  var i = state.groups.indexOf(g), j = i + dir;
-  if (j < 0 || j >= state.groups.length) return;
-  state.groups[i] = state.groups[j]; state.groups[j] = g;
+function moveGroup(k, g, dir){
+  var K = KIND[k], groups = K.groups();
+  sortGroups(groups);
+  var i = groups.indexOf(g), j = i + dir;
+  if (j < 0 || j >= groups.length) return;
+  groups[i] = groups[j]; groups[j] = g;
   var changed = [];
-  state.groups.forEach(function(x, k){ if (x.position !== k) { x.position = k; changed.push(x); } });
-  renderGroupList(); renderFavs();
-  Promise.all(changed.map(function(x){ return saveGroup(x, {position: x.position}); })).then(favSaved).catch(favFailed);
+  groups.forEach(function(x, n){ if (x.position !== n) { x.position = n; changed.push(x); } });
+  renderGroupList(k); K.render();
+  Promise.all(changed.map(function(x){ return saveGroup(k, x, {position: x.position}); })).then(K.saved).catch(K.failed);
 }
-function deleteGroup(g){
-  var n = state.favorites.filter(function(f){ return f.group === g.id; }).length;
+function deleteGroup(k, g){
+  var K = KIND[k], n = K.items().filter(function(f){ return f.group === g.id; }).length;
   if (!confirm('Delete the group "' + g.name + '"?' +
-      (n ? " Its " + n + " favorite" + (n === 1 ? " stays" : "s stay") + ", without a group." : ""))) return;
-  sb.from("fav_groups").delete().eq("id", g.id).select("id").then(oneRow).then(function(){
-    state.groups = state.groups.filter(function(x){ return x !== g; });
+      (n ? " Its " + n + " " + K.word + (n === 1 ? " stays" : "s stay") + ", without a group." : ""))) return;
+  sb.from(K.groupTable).delete().eq("id", g.id).select("id").then(oneRow).then(function(){
+    K.setGroups(K.groups().filter(function(x){ return x !== g; }));
     // The database did the same (on delete set null); mirror it rather than re-read.
-    state.favorites.forEach(function(f){ if (f.group === g.id) f.group = null; });
-    renderGroupList(); renderFavs(); favSaved();
-  }).catch(favFailed);
+    K.items().forEach(function(f){ if (f.group === g.id) f.group = null; });
+    renderGroupList(k); K.render(); K.saved();
+  }).catch(K.failed);
 }
-$("grpAdd").addEventListener("click", function(){
-  addGroup("New group", null).then(function(g){
-    renderGroupList(); favSaved();
-    var input = document.querySelector('.grp[data-gid="' + g.id + '"] .grp-name');
-    if (input) { input.focus(); input.select(); }
-  }).catch(favFailed);
+[["grpAdd", "fav"], ["pgrpAdd", "paper"]].forEach(function(a){
+  $(a[0]).addEventListener("click", function(){
+    var k = a[1], K = KIND[k];
+    addGroup(k, "New group", null).then(function(g){
+      renderGroupList(k); K.saved();
+      var input = $(K.listEl).querySelector('.grp[data-gid="' + g.id + '"] .grp-name');
+      if (input) { input.focus(); input.select(); }
+    }).catch(K.failed);
+  });
 });
 
 // ---------------------------------------------------------------- button size and shape (R039, R040)
@@ -1019,12 +1254,15 @@ function writeLocal(k, v){ try { if (v) localStorage.setItem(k, v); else localSt
   if (/^[1-5]$/.test(s || "")) favSize = s;
   if (SHAPES.indexOf(c) >= 0) favShape = c;
 })();
+// The same settings size the research buttons (R042, Seebo's ask).
 function applyFavSize(){
-  var g = $("favGrid");
-  g.dataset.size = favSize;
-  g.dataset.shape = favShape;
-  if (favPerRow) g.dataset.perRow = favPerRow; else delete g.dataset.perRow;
-  if (/^\d+$/.test(favPerRow)) g.style.setProperty("--per-row", favPerRow); else g.style.removeProperty("--per-row");
+  ["favGrid", "paperGrid"].forEach(function(id){
+    var g = $(id);
+    g.dataset.size = favSize;
+    g.dataset.shape = favShape;
+    if (favPerRow) g.dataset.perRow = favPerRow; else delete g.dataset.perRow;
+    if (/^\d+$/.test(favPerRow)) g.style.setProperty("--per-row", favPerRow); else g.style.removeProperty("--per-row");
+  });
 }
 
 // ---------------------------------------------------------------- settings (R022)
@@ -1055,7 +1293,8 @@ function openSettings(){
   $("favPerRow").value = favPerRow;
   $("favSize").value = favSize;
   $("favShape").value = favShape;
-  renderGroupList();
+  renderGroupList("fav");
+  renderGroupList("paper");
   mvFrom = currentTab;                              // "Move feeds" starts on the tab being looked at
   showPanel(setPanel);                              // reopens on the part last used
   $("setDlg").showModal();
@@ -1063,7 +1302,7 @@ function openSettings(){
 $("setForm").addEventListener("change", function(e){
   if (e.target.name === "favLabel") {
     state.favLabel = e.target.value;
-    renderFavs();                                   // seen behind the dialog at once
+    renderFavs(); renderPapers();                   // seen behind the dialog at once
     saveSetting({fav_label: state.favLabel});
   } else if (e.target.name === "favLayout") {       // R025
     state.favLayout = e.target.value;
@@ -1204,13 +1443,32 @@ document.addEventListener("click", function(e){
       openDialog("Add favorite", {askRow: state.favLayout !== "groups"}, "", function(t, u, s, gc, rowChoice){
         // New favorites go at the end (ruled with R015's go): of the last row --
         // or alone on a new row below it (R024) -- and of their group.
-        resolveGroup(gc).then(function(gid){
+        resolveGroup("fav", gc).then(function(gid){
           var row = !state.favorites.length ? 0 : lastRow() + (rowChoice === "new" ? 1 : 0);
           return sb.from("favorites").insert({title: t || host(u), short_name: s, url: u, group_id: gid,
-              row_no: row, position: endOfRow(row), group_pos: endOfGroup(gid)}).select(FAV_COLS)
+              row_no: row, position: endOfRow(row), group_pos: endOfGroup(gid, "fav")}).select(FAV_COLS)
             .then(oneRow).then(function(r){ state.favorites.push(favFromRow(r.data[0])); renderFavs(); favSaved(); });
         }).catch(favFailed);
-      }, true);
+      }, "fav");
+      break;
+    case "add-paper":                                // R042: joins the end of its group
+      openDialog("Add research", {file: true}, "A PDF of at most 25 MB. It is stored privately: only you, signed in, " +
+        "can open it. Leave the name empty to use the file's.", addPaper, "paper");
+      break;
+    case "edit-paper":
+      f = byId(state.papers, id);
+      openDialog("Edit paper", {name: f.title, short: f.short, group: f.group}, "File: " + f.file + " (" + sizeText(f.size) + ")",
+        function(t, file, s, gc){
+          resolveGroup("paper", gc).then(function(gid){
+            var patch = {title: t || f.title, short_name: s, group_id: gid};
+            if (gid !== f.group) patch.group_pos = endOfGroup(gid, "paper");
+            return sb.from("papers").update(patch).eq("id", f.id).select(PAPER_COLS)
+              .then(oneRow).then(function(r){ Object.assign(f, paperFromRow(r.data[0])); renderPapers(); paperSaved(); });
+          }).catch(paperFailed);
+        }, "paper");
+      break;
+    case "del-paper":
+      deletePaper(byId(state.papers, id));
       break;
     case "settings":
       openSettings();
@@ -1218,13 +1476,13 @@ document.addEventListener("click", function(e){
     case "edit-fav":
       f = byId(state.favorites, id);
       openDialog("Edit favorite", {name: f.title, url: f.url, short: f.short, group: f.group}, "", function(t, u, s, gc){
-        resolveGroup(gc).then(function(gid){
+        resolveGroup("fav", gc).then(function(gid){
           var patch = {title: t || host(u), short_name: s, url: u, group_id: gid};
-          if (gid !== f.group) patch.group_pos = endOfGroup(gid);        // joins the end of its new group
+          if (gid !== f.group) patch.group_pos = endOfGroup(gid, "fav");  // joins the end of its new group
           return sb.from("favorites").update(patch).eq("id", f.id).select(FAV_COLS)
             .then(oneRow).then(function(r){ Object.assign(f, favFromRow(r.data[0])); renderFavs(); favSaved(); });
         }).catch(favFailed);
-      }, true);
+      }, "fav");
       break;
     case "del-fav":
       f = byId(state.favorites, id);
@@ -1268,7 +1526,7 @@ document.addEventListener("click", function(e){
       break;
     case "add-feed":
       openDialog("Add feed", {}, "Paste a feed's address, or just the site's. It is checked live before " +
-        "anything is saved. Leave the name empty to use the feed's own.", function(name, u){ addFeed(name, u); }, false);
+        "anything is saved. Leave the name empty to use the feed's own.", function(name, u){ addFeed(name, u); });
       break;
   }
 }, true);
@@ -1309,7 +1567,7 @@ function startDrag(){
   ph.style.height = r.height + "px";
   // Fit to name (R040): a row of content-wide buttons gives the gap no width
   // of its own, so it keeps the dragged button's.
-  if (drag.kind === "fav" && favPerRow === "fit") ph.style.width = r.width + "px";
+  if (drag.kind !== "feed" && favPerRow === "fit") ph.style.width = r.width + "px";
   el.parentNode.insertBefore(ph, el);
   el.classList.add("dragging");
   Object.assign(el.style, {position: "fixed", left: r.left + "px", top: r.top + "px",
@@ -1347,6 +1605,7 @@ function finishDrag(commit){
   if (commit) {
     syncOrder(d.kind);
     if (d.kind === "fav") saveFavOrder();                                  // R015
+    else if (d.kind === "paper") savePaperOrder();                         // R042
     else saveFeedOrder().then(function(){ feedSaved(); }).catch(feedFailed); // R016
   }
   render();
@@ -1354,7 +1613,15 @@ function finishDrag(commit){
 
 // The DOM order after a drop is the new order; copy it back into the state.
 function syncOrder(kind){
-  if (kind === "fav" && state.favLayout === "groups") {
+  if (kind === "paper") {
+    // Research is always by group (R042): each zone a group, "" = no group.
+    document.querySelectorAll('#paperGrid [data-zone="paper"]').forEach(function(zone){
+      var gid = zone.dataset.group ? +zone.dataset.group : null;
+      Array.prototype.forEach.call(zone.querySelectorAll('[data-drag="paper"]'), function(n, pos){
+        var p = byId(state.papers, n.dataset.id); p.group = gid; p.gpos = pos;
+      });
+    });
+  } else if (kind === "fav" && state.favLayout === "groups") {
     // Each zone is a group ("" = no group); order within it is the group order.
     document.querySelectorAll('#favGrid [data-zone="fav"]').forEach(function(zone){
       var gid = zone.dataset.group ? +zone.dataset.group : null;
@@ -1410,11 +1677,15 @@ function showSignedOut(){
   cache = {};
   $("feedStatus").textContent = "";
   if (editing) $("editBtn").click();
-  $("editBtn").hidden = $("addBtn").hidden = $("setBtn").hidden = true;
+  $("editBtn").hidden = $("addBtn").hidden = $("addPaperBtn").hidden = $("setBtn").hidden = true;
   $("mine").hidden = true;
   $("loadMsg").hidden = true;
   $("buildNote").hidden = true;
   $("gate").hidden = false;
+  if (PAPER_ID) {                                   // R042: opening a paper, signed out
+    $("loadMsg").className = "note"; $("loadMsg").hidden = false;
+    $("loadMsg").textContent = "Sign in to open this paper.";
+  }
 }
 
 function showSignedIn(session){
@@ -1422,7 +1693,7 @@ function showSignedIn(session){
   userId = session.user.id;
   $("gate").hidden = true;
   $("gPass").value = "";
-  load();
+  if (PAPER_ID) openPaper(); else load();           // `?paper=<id>` opens just that (R042)
 }
 
 // opts.quiet: a background re-read (R029) -- no "Loading…" message, the open
@@ -1438,10 +1709,14 @@ function load(opts){
     sb.from("settings").select(SETTINGS_COLS).maybeSingle(),
     sb.from("feed_cache").select("feed_id,items,fetched_at,checked_at,last_error,last_error_at"),
     queryGroups(),
-    queryTabs()
+    queryTabs(),
+    queryPapers(),                                  // R042
+    queryPaperGroups()
   ]).then(function(r){
-    var err = r[0].error || r[1].error || r[2].error || r[3].error || r[4].error || r[5].error;
+    var err = r[0].error || r[1].error || r[2].error || r[3].error || r[4].error || r[5].error || r[6].error || r[7].error;
     if (err) throw err;
+    state.papers = r[6].data.map(paperFromRow);
+    state.pgroups = r[7].data;
     cache = {};
     r[3].data.forEach(function(row){ cache[row.feed_id] = row; });
     state.favorites = r[0].data.map(favFromRow);
@@ -1452,9 +1727,9 @@ function load(opts){
     applySettings(r[2].data);
     msg.hidden = true;
     // An empty answer is not a failed one (R17): say which it is.
-    $("emptyMsg").hidden = state.favorites.length + state.feeds.length > 0;
+    $("emptyMsg").hidden = state.favorites.length + state.feeds.length + state.papers.length > 0;
     $("buildNote").hidden = false;
-    $("editBtn").hidden = $("addBtn").hidden = $("setBtn").hidden = false;
+    $("editBtn").hidden = $("addBtn").hidden = $("addPaperBtn").hidden = $("setBtn").hidden = false;
     $("mine").hidden = false;
     render();
     lastVis = visibleCols();
@@ -1484,7 +1759,7 @@ function load(opts){
 // something is being edited, dragged or is open in a dialog.
 var hiddenAt = 0, AWAY_MS = 30000;
 function comeBack(){
-  if (!userId || !hiddenAt || Date.now() - hiddenAt < AWAY_MS) return;
+  if (!userId || PAPER_ID || !hiddenAt || Date.now() - hiddenAt < AWAY_MS) return;   // not while opening a paper (R042)
   if (editing || drag || document.querySelector("dialog[open]")) return;
   hiddenAt = 0;
   load({quiet: true});
