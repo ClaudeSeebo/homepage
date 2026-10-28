@@ -25,6 +25,10 @@
   (`homepage-research`), listed under the favorites in their own groups; a
   paper's button is `?paper=<id>`, which -- signed in -- opens the file by a
   link that expires in 5 minutes. Size and corners apply to both sections.
+  2026-10-28, Videos (R045): under Research; a link pasted into the section's
+  first box and Entered becomes a button -- a YouTube link named after the
+  video (asked of YouTube's oEmbed by this page), any other after its site.
+  Its own groups; the same buttons and settings.
   Published as index.html with Code-CB dot com's script (R005/R018); from this
   project, on Seebo's word, since 2026-10-11 (cb-dot-com R021, R038 here).
 -->
@@ -140,6 +144,15 @@ body.editing .fav small.addr{display:none}
    arranged by group. */
 #paperGrid:empty{display:none}
 dialog input[type="file"]{padding:6px;background:var(--card)}
+/* Videos (R045): the first "button" is a box to paste a link into. */
+#videoZones{display:contents}
+.fav.paste-box{border-style:dashed;background:transparent;color:var(--ink);font:inherit;font-size:var(--fav-font);
+  width:100%;min-height:var(--fav-h);box-shadow:none}
+.fav.paste-box::placeholder{color:var(--muted)}
+#videoPaste .paste-box{grid-column:span 2}           /* room for the hint and a pasted address */
+.fav.paste-box:focus{border-style:solid}
+.fav.paste-box:disabled{opacity:.6}
+@media (pointer:coarse){ .fav.paste-box{font-size:max(16px,var(--fav-font))} }  /* under 16px, iPhone zooms in on focus */
 
 /* ---- feeds ------------------------------------------------------------ */
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -325,6 +338,18 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
     <p class="note" id="paperEmpty" hidden>No papers yet — add a PDF with + Add research at the top.</p>
   </section>
 
+  <!-- Videos (R045): under Research. The paste box is the way to add. -->
+  <section aria-labelledby="videoH">
+    <div class="sec-head"><h2 id="videoH">Videos</h2><span class="feed-state" id="videoStatus" role="status"></span></div>
+    <div class="fav-grid by-group" id="videoGrid" data-zone="video">
+      <form class="fav-row" id="videoPaste" autocomplete="off">
+        <input class="fav paste-box" id="videoUrl" type="text" inputmode="url" enterkeyhint="go" spellcheck="false"
+               placeholder="Paste a link, press Enter" aria-label="Paste a video link, then press Enter">
+      </form>
+      <div id="videoZones"></div>
+    </div>
+  </section>
+
   <section aria-labelledby="feedH">
     <div class="sec-head">
       <h2 id="feedH">Feeds</h2>
@@ -397,11 +422,12 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
     <div class="set-switch" role="tablist" aria-label="Settings sections">
       <button type="button" role="tab" data-panel="fav" aria-selected="true">Favorites</button>
       <button type="button" role="tab" data-panel="research" aria-selected="false">Research</button>
+      <button type="button" role="tab" data-panel="videos" aria-selected="false">Videos</button>
       <button type="button" role="tab" data-panel="feeds" aria-selected="false">Feeds &amp; tabs</button>
     </div>
     <div data-panel-body="fav">
     <fieldset>
-      <legend>Favorites and research show</legend>
+      <legend>Favorites, research and videos show</legend>
       <label class="radio"><input type="radio" name="favLabel" value="name_url"> Name and address</label>
       <label class="radio"><input type="radio" name="favLabel" value="name"> Name only</label>
     </fieldset>
@@ -411,7 +437,7 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
       <label class="radio"><input type="radio" name="favLayout" value="groups"> By group — a row for each group, in the order below</label>
     </fieldset>
     <fieldset>
-      <legend>Buttons <span class="opt">— favorites and research, on this device only</span></legend>
+      <legend>Buttons <span class="opt">— favorites, research and videos, on this device only</span></legend>
       <div class="size-pick">
         <label>Per row
           <select id="favPerRow">
@@ -452,6 +478,15 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
     </fieldset>
     <p class="fine">Changes save as you make them. Deleting a group keeps its papers, without a group. Button size
       and corners are under Favorites and apply here too.</p>
+    </div>
+    <div data-panel-body="videos" hidden>
+    <fieldset>
+      <legend>Video groups <span class="opt">— a group's colour is used by all its videos</span></legend>
+      <div id="videoGroupList"></div>
+      <button type="button" class="small-btn" id="vgrpAdd">+ New group</button>
+    </fieldset>
+    <p class="fine">Changes save as you make them. Deleting a group keeps its videos, without a group. A pasted video
+      starts in No group: drag it into one in Edit mode, or choose its group with ✎.</p>
     </div>
     <div data-panel-body="feeds" hidden>
     <fieldset>
@@ -496,9 +531,10 @@ var sb = null, userId = null;
 
 // Filled from the database once signed in; empty until then.
 // favLabel / favLayout: the settings row's fav_label / fav_layout (R021).
-// papers / pgroups: research papers and their own groups (R042).
+// papers / pgroups: research papers and their own groups (R042); videos /
+// vgroups: the same for videos (R045).
 function emptyState(){ return {columns: 2, favLabel: "name_url", favLayout: "rows", favorites: [], groups: [], feeds: [], tabs: [],
-                               papers: [], pgroups: []}; }
+                               papers: [], pgroups: [], videos: [], vgroups: []}; }
 var state = emptyState();
 var editing = false;
 var MIN_COUNT = 1, MAX_COUNT = 20;
@@ -597,6 +633,26 @@ function renderPapers(){
   grid.innerHTML = state.papers.length || state.pgroups.length ? groupZones("paper").map(zoneHtml("paper", paperTile)).join("") : "";
   $("paperEmpty").hidden = state.papers.length > 0;
 }
+// Videos (R045): always by group, like Research. A video is a link, so its
+// button opens it like a favorite; the second line is its site.
+function videoTile(v){
+  var g = groupOf(v, "video");
+  var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
+  return '<a class="fav"' + colour + ' data-drag="video" data-id="' + v.id + '" href="' + esc(v.url) + '" title="' + esc(v.title) + '">' +
+    '<b>' + esc(v.short || v.title) + '</b><small class="addr">' + esc(host(v.url)) + '</small>' +
+    '<small class="grp' + (g ? '' : ' none') + '">' + esc(g ? g.name : "No group") + '</small>' +
+    '<span class="tools">' +
+      '<button class="icon-btn" data-action="edit-video" data-id="' + v.id + '" aria-label="Edit ' + esc(v.title) + '">✎</button>' +
+      '<button class="icon-btn del" data-action="del-video" data-id="' + v.id + '" aria-label="Delete ' + esc(v.title) + '">✕</button>' +
+    '</span></a>';
+}
+function renderVideos(){
+  var grid = $("videoGrid");
+  grid.classList.toggle("name-only", state.favLabel === "name");
+  applyFavSize();
+  // The paste box is outside the zones, so redrawing never loses what is typed in it.
+  $("videoZones").innerHTML = state.videos.length || state.vgroups.length ? groupZones("video").map(zoneHtml("video", videoTile)).join("") : "";
+}
 function sizeText(n){ return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB"; }
 // Freeform rows (R024): one drop zone per row, in row order (gaps in the
 // numbers are harmless); "+ New row" follows, seen only in Edit mode.
@@ -685,6 +741,7 @@ function showPanel(p){
   document.querySelectorAll("[data-panel-body]").forEach(function(d){ d.hidden = d.dataset.panelBody !== p; });
   if (p === "feeds") { renderTabList(); renderMover(); }
   if (p === "research") { renderGroupList("paper"); renderMeter(); }
+  if (p === "videos") renderGroupList("video");
 }
 function tabCount(id){ return state.feeds.filter(function(f){ return f.tab === id; }).length; }
 function saveTabRow(t, patch){ return sb.from("feed_tabs").update(patch).eq("id", t.id).select("id").then(oneRow); }
@@ -833,7 +890,7 @@ function renderFeeds(){
   });
 }
 
-function render(){ renderFavs(); renderPapers(); renderFeeds(); }
+function render(){ renderFavs(); renderPapers(); renderVideos(); renderFeeds(); }
 
 // ---------------------------------------------------------------- edit switch
 $("editBtn").addEventListener("click", function(){
@@ -1077,13 +1134,15 @@ function deletePaper(p){
     });
   }).catch(paperFailed);
 }
-function savePaperOrder(){
-  var changed = state.papers.filter(function(p){ return p.group !== p._group || p.gpos !== p._gpos; });
+// After a drag in a section that is always by group (research, videos): write
+// only the buttons whose group or place changed.
+function saveGroupedOrder(k){
+  var K = KIND[k], changed = K.items().filter(function(p){ return p.group !== p._group || p.gpos !== p._gpos; });
   if (!changed.length) return;
   Promise.all(changed.map(function(p){
-    return sb.from("papers").update({group_id: p.group, group_pos: p.gpos}).eq("id", p.id).select("id").then(oneRow)
+    return sb.from(K.table).update({group_id: p.group, group_pos: p.gpos}).eq("id", p.id).select("id").then(oneRow)
       .then(function(){ p._group = p.group; p._gpos = p.gpos; });
-  })).then(paperSaved).catch(paperFailed);
+  })).then(K.saved).catch(K.failed);
 }
 // Settings -> Research: what the bucket holds, asked of Storage itself (not
 // added up from the list), against the free plan's 1 GB for the whole project.
@@ -1101,6 +1160,64 @@ function renderMeter(){
     el.textContent = text;
   }).catch(function(err){ el.textContent = "Couldn't measure: " + (err && err.message ? err.message : err); });
 }
+// ---------------------------------------------------------------- videos (R045)
+// Added by pasting a link into the section's first box and pressing Enter.
+// The name: for a YouTube link, the video's title, asked of YouTube's oEmbed
+// by this page (it answers this site's pages directly -- checked 2026-10-28);
+// otherwise, or if YouTube does not answer, the site's name. Renamable with ✎.
+// A new video joins the end of "No group".
+var VIDEO_COLS = "id,title,short_name,url,group_id,group_pos";
+var YOUTUBE = /^(www\.|m\.|music\.)?(youtube\.com|youtu\.be)$/i;
+function videoFromRow(r){
+  return {id: r.id, title: r.title, short: r.short_name, url: r.url,
+          group: r.group_id, gpos: r.group_pos, _group: r.group_id, _gpos: r.group_pos};
+}
+function queryVideos(){ return sb.from("videos").select(VIDEO_COLS).order("group_pos"); }
+function queryVideoGroups(){ return sb.from("video_groups").select(GROUP_COLS).order("position"); }
+function reloadVideos(){
+  return Promise.all([queryVideos(), queryVideoGroups()]).then(function(r){
+    check(r[0]); check(r[1]);
+    state.videos = r[0].data.map(videoFromRow);
+    state.vgroups = r[1].data;
+    renderVideos();
+    if ($("setDlg").open) renderGroupList("video");
+  });
+}
+function videoSaved(){
+  var s = $("videoStatus"); s.className = "feed-state"; s.textContent = "Saved";
+  setTimeout(function(){ if (s.textContent === "Saved") s.textContent = ""; }, 1500);
+}
+function videoFailed(err){
+  var s = $("videoStatus"); s.className = "feed-state err";
+  s.textContent = "Couldn't save: " + (err && err.message ? err.message : err) + " — showing what is saved.";
+  reloadVideos().catch(function(){});
+}
+function videoName(u){
+  var h; try { h = new URL(u).hostname; } catch (e) { h = ""; }
+  if (!YOUTUBE.test(h)) return Promise.resolve(host(u));
+  var opts = typeof AbortSignal !== "undefined" && AbortSignal.timeout ? {signal: AbortSignal.timeout(8000)} : {};
+  return fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(u), opts)
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ return j && j.title ? String(j.title).trim() : host(u); })
+    .catch(function(){ return host(u); });
+}
+$("videoPaste").addEventListener("submit", function(e){
+  e.preventDefault();
+  // Stricter than normalUrl (which favorites share): pasted text with spaces,
+  // or with no dot in its site, is not a link -- "not a link" would otherwise
+  // become https://not%20a%20link/ (seen in testing, 2026-10-28).
+  var box = $("videoUrl"), st = $("videoStatus"), raw = box.value.trim(), u = /\s/.test(raw) ? null : normalUrl(raw);
+  if (u && !/\.[a-z]{2,}$/i.test(new URL(u).hostname)) u = null;
+  if (!u) { st.className = "feed-state err"; st.textContent = "That doesn't look like a link."; return; }
+  box.disabled = true; st.className = "feed-state"; st.textContent = "Adding…";
+  videoName(u).then(function(name){
+    return sb.from("videos").insert({title: (name || host(u)).slice(0, 200), url: u, group_id: null,
+        group_pos: endOfGroup(null, "video")}).select(VIDEO_COLS).then(oneRow);
+  }).then(function(r){
+    state.videos.push(videoFromRow(r.data[0])); renderVideos(); box.value = ""; videoSaved();
+  }).catch(videoFailed).then(function(){ box.disabled = false; box.focus(); });
+});
+
 // `?paper=<id>`: this page opens that paper instead of itself (R042 ruling:
 // a lasting link on his domain that works only signed in). The file is
 // fetched by a signed link that expires in 5 minutes -- so the address the
@@ -1132,10 +1249,14 @@ var KIND = {
           items: function(){ return state.favorites; }, groups: function(){ return state.groups; },
           setGroups: function(list){ state.groups = list; },
           render: function(){ renderFavs(); }, saved: function(){ favSaved(); }, failed: function(err){ favFailed(err); }},
-  paper: {groupTable: "paper_groups", listEl: "paperGroupList", word: "paper", short: "paper",
+  paper: {groupTable: "paper_groups", listEl: "paperGroupList", word: "paper", short: "paper", table: "papers",
           items: function(){ return state.papers; }, groups: function(){ return state.pgroups; },
           setGroups: function(list){ state.pgroups = list; },
-          render: function(){ renderPapers(); }, saved: function(){ paperSaved(); }, failed: function(err){ paperFailed(err); }}
+          render: function(){ renderPapers(); }, saved: function(){ paperSaved(); }, failed: function(err){ paperFailed(err); }},
+  video: {groupTable: "video_groups", listEl: "videoGroupList", word: "video", short: "video", table: "videos",
+          items: function(){ return state.videos; }, groups: function(){ return state.vgroups; },
+          setGroups: function(list){ state.vgroups = list; },
+          render: function(){ renderVideos(); }, saved: function(){ videoSaved(); }, failed: function(err){ videoFailed(err); }}
 };
 function addGroup(k, name, color){
   var K = KIND[k], pos = K.groups().reduce(function(m, g){ return Math.max(m, g.position + 1); }, 0);
@@ -1225,7 +1346,7 @@ function deleteGroup(k, g){
     renderGroupList(k); K.render(); K.saved();
   }).catch(K.failed);
 }
-[["grpAdd", "fav"], ["pgrpAdd", "paper"]].forEach(function(a){
+[["grpAdd", "fav"], ["pgrpAdd", "paper"], ["vgrpAdd", "video"]].forEach(function(a){
   $(a[0]).addEventListener("click", function(){
     var k = a[1], K = KIND[k];
     addGroup(k, "New group", null).then(function(g){
@@ -1256,7 +1377,7 @@ function writeLocal(k, v){ try { if (v) localStorage.setItem(k, v); else localSt
 })();
 // The same settings size the research buttons (R042, Seebo's ask).
 function applyFavSize(){
-  ["favGrid", "paperGrid"].forEach(function(id){
+  ["favGrid", "paperGrid", "videoGrid"].forEach(function(id){
     var g = $(id);
     g.dataset.size = favSize;
     g.dataset.shape = favShape;
@@ -1295,6 +1416,7 @@ function openSettings(){
   $("favShape").value = favShape;
   renderGroupList("fav");
   renderGroupList("paper");
+  renderGroupList("video");
   mvFrom = currentTab;                              // "Move feeds" starts on the tab being looked at
   showPanel(setPanel);                              // reopens on the part last used
   $("setDlg").showModal();
@@ -1302,7 +1424,7 @@ function openSettings(){
 $("setForm").addEventListener("change", function(e){
   if (e.target.name === "favLabel") {
     state.favLabel = e.target.value;
-    renderFavs(); renderPapers();                   // seen behind the dialog at once
+    renderFavs(); renderPapers(); renderVideos();   // seen behind the dialog at once
     saveSetting({fav_label: state.favLabel});
   } else if (e.target.name === "favLayout") {       // R025
     state.favLayout = e.target.value;
@@ -1470,6 +1592,25 @@ document.addEventListener("click", function(e){
     case "del-paper":
       deletePaper(byId(state.papers, id));
       break;
+    case "edit-video":                               // R045
+      f = byId(state.videos, id);
+      openDialog("Edit video", {name: f.title, url: f.url, short: f.short, group: f.group}, "", function(t, u, s, gc){
+        resolveGroup("video", gc).then(function(gid){
+          var patch = {title: t || f.title, short_name: s, url: u, group_id: gid};
+          if (gid !== f.group) patch.group_pos = endOfGroup(gid, "video");
+          return sb.from("videos").update(patch).eq("id", f.id).select(VIDEO_COLS)
+            .then(oneRow).then(function(r){ Object.assign(f, videoFromRow(r.data[0])); renderVideos(); videoSaved(); });
+        }).catch(videoFailed);
+      }, "video");
+      break;
+    case "del-video":
+      f = byId(state.videos, id);
+      if (confirm('Delete the video "' + f.title + '"?')) {
+        sb.from("videos").delete().eq("id", f.id).select("id").then(oneRow).then(function(){
+          state.videos = state.videos.filter(function(x){ return x !== f; }); renderVideos(); videoSaved();
+        }).catch(videoFailed);
+      }
+      break;
     case "settings":
       openSettings();
       break;
@@ -1605,7 +1746,7 @@ function finishDrag(commit){
   if (commit) {
     syncOrder(d.kind);
     if (d.kind === "fav") saveFavOrder();                                  // R015
-    else if (d.kind === "paper") savePaperOrder();                         // R042
+    else if (d.kind === "paper" || d.kind === "video") saveGroupedOrder(d.kind);   // R042, R045
     else saveFeedOrder().then(function(){ feedSaved(); }).catch(feedFailed); // R016
   }
   render();
@@ -1613,12 +1754,12 @@ function finishDrag(commit){
 
 // The DOM order after a drop is the new order; copy it back into the state.
 function syncOrder(kind){
-  if (kind === "paper") {
-    // Research is always by group (R042): each zone a group, "" = no group.
-    document.querySelectorAll('#paperGrid [data-zone="paper"]').forEach(function(zone){
+  if (kind === "paper" || kind === "video") {
+    // Research and videos are always by group (R042, R045): each zone a group, "" = no group.
+    document.querySelectorAll('#' + kind + 'Grid [data-zone="' + kind + '"]').forEach(function(zone){
       var gid = zone.dataset.group ? +zone.dataset.group : null;
-      Array.prototype.forEach.call(zone.querySelectorAll('[data-drag="paper"]'), function(n, pos){
-        var p = byId(state.papers, n.dataset.id); p.group = gid; p.gpos = pos;
+      Array.prototype.forEach.call(zone.querySelectorAll('[data-drag="' + kind + '"]'), function(n, pos){
+        var p = byId(KIND[kind].items(), n.dataset.id); p.group = gid; p.gpos = pos;
       });
     });
   } else if (kind === "fav" && state.favLayout === "groups") {
@@ -1711,12 +1852,16 @@ function load(opts){
     queryGroups(),
     queryTabs(),
     queryPapers(),                                  // R042
-    queryPaperGroups()
+    queryPaperGroups(),
+    queryVideos(),                                  // R045
+    queryVideoGroups()
   ]).then(function(r){
-    var err = r[0].error || r[1].error || r[2].error || r[3].error || r[4].error || r[5].error || r[6].error || r[7].error;
+    var err = r.reduce(function(e, x){ return e || x.error; }, null);
     if (err) throw err;
     state.papers = r[6].data.map(paperFromRow);
     state.pgroups = r[7].data;
+    state.videos = r[8].data.map(videoFromRow);
+    state.vgroups = r[9].data;
     cache = {};
     r[3].data.forEach(function(row){ cache[row.feed_id] = row; });
     state.favorites = r[0].data.map(favFromRow);
@@ -1727,7 +1872,7 @@ function load(opts){
     applySettings(r[2].data);
     msg.hidden = true;
     // An empty answer is not a failed one (R17): say which it is.
-    $("emptyMsg").hidden = state.favorites.length + state.feeds.length + state.papers.length > 0;
+    $("emptyMsg").hidden = state.favorites.length + state.feeds.length + state.papers.length + state.videos.length > 0;
     $("buildNote").hidden = false;
     $("editBtn").hidden = $("addBtn").hidden = $("addPaperBtn").hidden = $("setBtn").hidden = false;
     $("mine").hidden = false;
