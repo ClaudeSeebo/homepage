@@ -29,6 +29,8 @@
   first box and Entered becomes a button -- a YouTube link named after the
   video (asked of YouTube's oEmbed by this page), any other after its site.
   Its own groups; the same buttons and settings.
+  2026-10-29, section order (R046): in Edit mode each section heading has
+  up/down buttons; the order is kept in this browser only, like button size.
   Published as index.html with Code-CB dot com's script (R005/R018); from this
   project, on Seebo's word, since 2026-10-11 (cb-dot-com R021, R038 here).
 -->
@@ -75,6 +77,9 @@ h2{font-size:.8rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase
 .note{color:var(--muted);font-size:.85rem;margin:0 0 18px}
 .edit-only{display:none}
 body.editing .edit-only{display:revert}
+/* Section order (R046): up/down beside each heading, in Edit mode only. */
+body.editing .sec-move{display:inline-flex;gap:4px}
+@media (pointer:coarse){ .sec-move .icon-btn{width:36px;height:36px;font-size:1rem} }
 
 /* ---- favorites -------------------------------------------------------- */
 .sec-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 8px}
@@ -326,21 +331,21 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
   <p class="note" id="loadMsg" role="status" hidden></p>
 
   <div id="mine" hidden>
-  <section aria-labelledby="favH">
-    <div class="sec-head"><h2 id="favH">Favorites</h2><span class="feed-state" id="favStatus" role="status"></span></div>
+  <section aria-labelledby="favH" data-sec="fav">
+    <div class="sec-head"><h2 id="favH">Favorites</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Favorites up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Favorites down">↓</button></span><span class="feed-state" id="favStatus" role="status"></span></div>
     <div class="fav-grid" id="favGrid" data-zone="fav"></div>
   </section>
 
   <!-- Research (R042): under the favorites, in its own groups. -->
-  <section aria-labelledby="paperH">
-    <div class="sec-head"><h2 id="paperH">Research</h2><span class="feed-state" id="paperStatus" role="status"></span></div>
+  <section aria-labelledby="paperH" data-sec="paper">
+    <div class="sec-head"><h2 id="paperH">Research</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Research up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Research down">↓</button></span><span class="feed-state" id="paperStatus" role="status"></span></div>
     <div class="fav-grid by-group" id="paperGrid" data-zone="paper"></div>
     <p class="note" id="paperEmpty" hidden>No papers yet — add a PDF with + Add research at the top.</p>
   </section>
 
   <!-- Videos (R045): under Research. The paste box is the way to add. -->
-  <section aria-labelledby="videoH">
-    <div class="sec-head"><h2 id="videoH">Videos</h2><span class="feed-state" id="videoStatus" role="status"></span></div>
+  <section aria-labelledby="videoH" data-sec="video">
+    <div class="sec-head"><h2 id="videoH">Videos</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Videos up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Videos down">↓</button></span><span class="feed-state" id="videoStatus" role="status"></span></div>
     <div class="fav-grid by-group" id="videoGrid" data-zone="video">
       <form class="fav-row" id="videoPaste" autocomplete="off">
         <input class="fav paste-box" id="videoUrl" type="text" inputmode="url" enterkeyhint="go" spellcheck="false"
@@ -350,9 +355,9 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
     </div>
   </section>
 
-  <section aria-labelledby="feedH">
+  <section aria-labelledby="feedH" data-sec="feed">
     <div class="sec-head">
-      <h2 id="feedH">Feeds</h2>
+      <h2 id="feedH">Feeds</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Feeds up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Feeds down">↓</button></span>
       <span class="feed-state" id="feedStatus" role="status"></span>
       <span class="edit-only">
         <span class="seg" role="group" aria-label="Columns">
@@ -898,6 +903,39 @@ $("editBtn").addEventListener("click", function(){
   document.body.classList.toggle("editing", editing);
   this.setAttribute("aria-pressed", String(editing));
   this.textContent = editing ? "Done" : "Edit";
+});
+
+// ---------------------------------------------------------------- section order (R046)
+// Per device, like button size (Seebo 2026-10-29: the phone may want Videos
+// first), so it is kept in this browser, not in `settings`. Moved with the
+// up/down buttons beside each heading in Edit mode. Unset, or anything but the
+// four sections once each, = the page as built.
+var SEC_KEY = "homepage-section-order", SECTIONS = ["fav", "paper", "video", "feed"], secOrder = SECTIONS.slice();
+(function(){
+  var s = (readLocal(SEC_KEY) || "").split(",");
+  if (s.length === SECTIONS.length && SECTIONS.every(function(k){ return s.indexOf(k) >= 0; })) secOrder = s;
+})();
+function applySectionOrder(){
+  var mine = $("mine"), foot = mine.querySelector(":scope > footer");
+  secOrder.forEach(function(k, i){
+    var sec = mine.querySelector(':scope > section[data-sec="' + k + '"]');
+    mine.insertBefore(sec, foot);
+    sec.querySelector('[data-move="up"]').disabled = i === 0;
+    sec.querySelector('[data-move="down"]').disabled = i === secOrder.length - 1;
+  });
+}
+applySectionOrder();
+$("mine").addEventListener("click", function(e){
+  var b = e.target.closest("[data-move]");
+  if (!b) return;
+  var k = b.closest("section").dataset.sec, i = secOrder.indexOf(k), j = i + (b.dataset.move === "up" ? -1 : 1);
+  if (j < 0 || j >= secOrder.length) return;
+  secOrder.splice(i, 1);
+  secOrder.splice(j, 0, k);
+  writeLocal(SEC_KEY, secOrder.join(",") === SECTIONS.join(",") ? "" : secOrder.join(","));
+  applySectionOrder();
+  // Moving the section drops focus; put it back, on the other arrow at an end.
+  (b.disabled ? b.parentNode.querySelector("[data-move]:not(:disabled)") : b).focus();
 });
 
 // ---------------------------------------------------------------- dialog
