@@ -31,6 +31,10 @@
   Its own groups; the same buttons and settings.
   2026-10-29, section order (R046): in Edit mode each section heading has
   up/down buttons; the order is kept in this browser only, like button size.
+  2026-10-29, themes (R047): Settings > Theme picks one of five looks (or
+  Today's), kept in this browser only; a theme sets the default corners, and
+  Corners gains "cut" and "ruled". Fonts load from Google Fonts only while a
+  theme is on.
   Published as index.html with Code-CB dot com's script (R005/R018); from this
   project, on Seebo's word, since 2026-10-11 (cb-dot-com R021, R038 here).
 -->
@@ -297,7 +301,198 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
 .gmsg.err,.note.err{color:var(--danger)}
 .foot{margin-top:32px;text-align:right}
 .linkish{border:0;background:none;color:var(--muted);font-size:.85rem;cursor:pointer;text-decoration:underline;padding:0}
+
+/* ---- two more corner shapes (R047) -------------------------------------
+   Any theme may use them; Mineral and Broadsheet default to them. "cut"
+   clips two corners, which would also clip an outline, so its focus mark is
+   drawn inside. "ruled" has no box: a rule above the name, coloured by group. */
+.fav-grid[data-shape="cut"],.fav-grid[data-shape="ruled"]{--fav-radius:0}
+.fav-grid[data-shape="cut"] .fav:not(.paste-box){border-color:transparent;
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+.fav-grid[data-shape="cut"] .fav:not(.paste-box):hover,
+.fav-grid[data-shape="cut"] .fav:not(.paste-box):focus-visible{outline:2px solid var(--accent);outline-offset:-5px}
+.fav-grid[data-shape="ruled"] .fav:not(.paste-box){border:0;border-top:1px solid var(--line);background:transparent;
+  box-shadow:none}
+.fav-grid[data-shape="ruled"] .fav[data-color]:not(.paste-box){border-top:3px solid var(--fedge)}
+.fav-grid[data-shape="ruled"] .fav:not(.paste-box):hover,
+.fav-grid[data-shape="ruled"] .fav:not(.paste-box):focus-visible{border-top-color:var(--accent)}
+
+/* ---- themes (R047) -----------------------------------------------------
+   Chosen in Settings, kept in this browser (Seebo 2026-10-29). No theme =
+   the page as it was: nothing below applies without html[data-theme]. Each
+   theme sets the page's colour values, its fonts (loaded from Google Fonts
+   only while it is on) and a few shapes. Observatory is always dark and
+   Catalogue always light, whatever the device's mode (Seebo's ruling).
+   A group's tint is mixed from its colour and the theme's card colour. */
+html[data-theme] body{font-family:var(--font)}
+html[data-theme] .fav[data-color]{--fbg:color-mix(in srgb,var(--fedge) 16%,var(--card))}
+@media (max-width:639px){
+  html[data-theme] .quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  html[data-theme] .q{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  html[data-theme] .top-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin-left:0}
+  html[data-theme] .tabs{flex-wrap:nowrap;overflow-x:auto}
+  html[data-theme] .tab{flex:none;white-space:nowrap}
+}
+@media (pointer:coarse){
+  html[data-theme] .q,html[data-theme] .top-btn,html[data-theme] .tab{min-height:44px}
+  html[data-theme] .q{padding-top:0;padding-bottom:0}
+}
+
+/* Broadsheet: newsprint and ink; ruled lines instead of boxes. */
+html[data-theme="broadsheet"]{--font:"Source Sans 3",system-ui,sans-serif;--serif:Newsreader,Georgia,serif;
+  --bg:#f4efe6;--card:#fbf8f2;--ink:#1f1b16;--muted:#5f574d;--line:#d9d0c2;--accent:#8a2c1d;--accent-ink:#ffffff;
+  --soft:#ece5d8;--danger:#a8201a;--shadow:none}
+@media (prefers-color-scheme: dark){
+  html[data-theme="broadsheet"]{--bg:#1a1714;--card:#221e1a;--ink:#ece4d6;--muted:#b9ae9e;--line:#3a332c;
+    --accent:#e08a6e;--accent-ink:#1a1714;--soft:#2b2620;--danger:#f2b8b5}
+}
+html[data-theme="broadsheet"] .q,html[data-theme="broadsheet"] .top-btn{border-radius:2px}
+html[data-theme="broadsheet"] .q i{border-radius:1px;font-family:var(--serif)}
+html[data-theme="broadsheet"] .sec-head{border-top:3px double var(--ink);padding-top:6px}
+html[data-theme="broadsheet"] h2{font:italic 500 1.45rem/1.2 var(--serif);letter-spacing:0;text-transform:none;color:var(--ink)}
+html[data-theme="broadsheet"] .tabs{gap:2px 18px}
+html[data-theme="broadsheet"] .tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 0 8px;
+  font-weight:700;font-size:.78rem;letter-spacing:.09em;text-transform:uppercase}
+html[data-theme="broadsheet"] .tab[aria-selected="true"]{background:none;border-bottom-color:var(--accent)}
+html[data-theme="broadsheet"] .feed{background:transparent;border:0;border-top:2px solid var(--ink);border-radius:0;box-shadow:none;padding:8px 0 4px}
+html[data-theme="broadsheet"] .feed header a{font-size:.78rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+html[data-theme="broadsheet"] .feed li{font:400 1.06rem/1.35 var(--serif);padding:7px 0;border-top-style:dotted}
+
+/* Observatory: night sky, always dark; pills with a lit dot for the group. */
+html[data-theme="observatory"]{color-scheme:dark;--font:Manrope,system-ui,sans-serif;
+  --bg:#0e1324;--card:#161c33;--ink:#e6e9f5;--muted:#9aa3c2;--line:#2a3354;--accent:#f2c46d;--accent-ink:#1a1406;
+  --soft:#1d2440;--danger:#f2b8b5;--shadow:none}
+html[data-theme="observatory"] body{background-image:radial-gradient(1.2px 1.2px at 8% 12%,rgba(230,233,245,.55),transparent 70%),
+  radial-gradient(1px 1px at 23% 41%,rgba(230,233,245,.35),transparent 70%),radial-gradient(1.4px 1.4px at 47% 7%,rgba(242,196,109,.6),transparent 70%),
+  radial-gradient(1px 1px at 71% 28%,rgba(230,233,245,.4),transparent 70%),radial-gradient(1.2px 1.2px at 89% 15%,rgba(143,179,255,.55),transparent 70%),
+  radial-gradient(1px 1px at 93% 62%,rgba(230,233,245,.3),transparent 70%),radial-gradient(1px 1px at 4% 78%,rgba(230,233,245,.3),transparent 70%),
+  radial-gradient(1.2px 1.2px at 58% 88%,rgba(143,179,255,.4),transparent 70%);background-size:640px 640px}
+html[data-theme="observatory"] [data-color="red"]{--fedge:#f28b82}
+html[data-theme="observatory"] [data-color="orange"]{--fedge:#f6ad6f}
+html[data-theme="observatory"] [data-color="amber"]{--fedge:#f2cc5c}
+html[data-theme="observatory"] [data-color="green"]{--fedge:#81c995}
+html[data-theme="observatory"] [data-color="teal"]{--fedge:#72cdc2}
+html[data-theme="observatory"] [data-color="blue"]{--fedge:#8ab4f8}
+html[data-theme="observatory"] [data-color="purple"]{--fedge:#c3a4f2}
+html[data-theme="observatory"] [data-color="pink"]{--fedge:#f48fb1}
+html[data-theme="observatory"] h2{font-weight:700;font-size:.78rem;letter-spacing:.14em}
+html[data-theme="observatory"] h2::before{content:"✦\FE0E";color:var(--accent);margin-right:8px}
+html[data-theme="observatory"] .sec-head::after{content:"";flex:1 1 40px;height:1px;background:var(--line)}
+html[data-theme="observatory"] .fav[data-color]{background:var(--card);box-shadow:none;padding-left:calc(var(--fav-pad-x) + 16px)}
+html[data-theme="observatory"] .fav[data-color]::before{content:"";position:absolute;left:12px;top:50%;width:8px;height:8px;margin-top:-4px;
+  border-radius:50%;background:var(--fedge);box-shadow:0 0 0 3px color-mix(in srgb,var(--fedge) 22%,transparent)}
+html[data-theme="observatory"] .tabs{display:inline-flex;max-width:100%;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--card)}
+html[data-theme="observatory"] .tab{border:0;border-radius:999px;margin:0;padding:8px 15px}
+html[data-theme="observatory"] .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+html[data-theme="observatory"] .tab[aria-selected="true"] .n{color:var(--accent-ink)}
+html[data-theme="observatory"] .feed{border-radius:20px;padding:12px 18px 12px}
+html[data-theme="observatory"] .feed header a{color:#a9c1ff}
+
+/* Mineral: stone tones; cut corners and a coloured notch for the group. */
+html[data-theme="mineral"]{--font:Figtree,system-ui,sans-serif;
+  --bg:#e9e6df;--card:#f6f4ef;--ink:#23262a;--muted:#575a57;--line:#d3cec4;--accent:#2f5d62;--accent-ink:#ffffff;
+  --soft:#dedad1;--danger:#a3271d;--shadow:none}
+@media (prefers-color-scheme: dark){
+  html[data-theme="mineral"]{--bg:#1b1d1f;--card:#25282b;--ink:#e7e4dd;--muted:#b8b5ad;--line:#34383c;--accent:#8cc7c4;
+    --accent-ink:#0f2524;--soft:#141618;--danger:#f2b8b5}
+}
+html[data-theme="mineral"] h2{color:var(--accent);font-weight:700;letter-spacing:.12em}
+html[data-theme="mineral"] h2::before{content:"";display:inline-block;width:8px;height:8px;margin:0 10px 1px 2px;
+  background:var(--accent);transform:rotate(45deg)}
+html[data-theme="mineral"] .fav[data-color]{box-shadow:none}
+html[data-theme="mineral"] .fav[data-color]::after{content:"";position:absolute;top:0;right:0;width:14px;height:14px;
+  background:var(--fedge);clip-path:polygon(0 0,100% 0,100% 100%)}
+html[data-theme="mineral"] body.editing .fav[data-color]::after{display:none}   /* the ✎ ✕ sit there; the group is named on the button */
+html[data-theme="mineral"] .q,html[data-theme="mineral"] .top-btn{border:0;border-radius:0;box-shadow:none;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+html[data-theme="mineral"] .q i{border-radius:0}
+html[data-theme="mineral"] .tabs{border-bottom:0;gap:6px}
+html[data-theme="mineral"] .tab{border:0;border-radius:0;margin:0;background:var(--card);color:var(--ink);
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+html[data-theme="mineral"] .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+html[data-theme="mineral"] .tab[aria-selected="true"] .n{color:var(--accent-ink)}
+html[data-theme="mineral"] .feed{border:0;border-radius:0;padding:12px 18px;
+  clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px)}
+
+/* Catalogue: a card catalogue, always light; index cards with a group tab. */
+html[data-theme="catalogue"]{color-scheme:light;--font:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+  --bg:#ece6d8;--card:#fffdf7;--ink:#26231d;--muted:#645d51;--line:#d6ccb8;--accent:#a33a26;--accent-ink:#ffffff;
+  --soft:#e2dac8;--danger:#a33a26;--shadow:0 1px 0 #d6ccb8}
+@media (prefers-color-scheme: dark){
+  html[data-theme="catalogue"] [data-color="red"]{--fedge:#c5221f}
+  html[data-theme="catalogue"] [data-color="orange"]{--fedge:#d35f0b}
+  html[data-theme="catalogue"] [data-color="amber"]{--fedge:#b58100}
+  html[data-theme="catalogue"] [data-color="green"]{--fedge:#188038}
+  html[data-theme="catalogue"] [data-color="teal"]{--fedge:#0f7b73}
+  html[data-theme="catalogue"] [data-color="blue"]{--fedge:#1a73e8}
+  html[data-theme="catalogue"] [data-color="purple"]{--fedge:#7b3fc4}
+  html[data-theme="catalogue"] [data-color="pink"]{--fedge:#c2185b}
+}
+html[data-theme="catalogue"] .fav:not(.paste-box){background-color:var(--card);background-image:linear-gradient(var(--fedge,#c4b9a3),var(--fedge,#c4b9a3));
+  background-repeat:no-repeat;background-size:36px 5px;background-position:11px 0}
+html[data-theme="catalogue"] .fav[data-color]{box-shadow:var(--shadow)}
+html[data-theme="catalogue"] .fav small,html[data-theme="catalogue"] .tab .n{font-family:var(--mono)}
+html[data-theme="catalogue"] .q i{font-family:var(--mono);border-radius:2px}
+html[data-theme="catalogue"] .q,html[data-theme="catalogue"] .top-btn{border-radius:3px}
+html[data-theme="catalogue"] h2{display:inline-block;padding:5px 12px;border:1.5px solid var(--ink);border-radius:2px;background:var(--card);
+  font:500 .75rem/1 var(--mono);letter-spacing:.14em;color:var(--ink)}
+html[data-theme="catalogue"] .sec-head::after{content:"";flex:1 1 40px;height:1px;background:var(--line)}
+html[data-theme="catalogue"] .tab{background:var(--soft);color:var(--ink);border-radius:8px 8px 0 0}
+html[data-theme="catalogue"] .tab[aria-selected="true"]{background:var(--card)}
+html[data-theme="catalogue"] .feed{border-radius:3px}
+html[data-theme="catalogue"] .feed header{padding-bottom:6px;border-bottom:1.5px solid #e3a597}
+html[data-theme="catalogue"] .feed li{border-top-color:#c9d6e6}
+
+/* Contour: a topographic map; a lettered badge for the group. */
+html[data-theme="contour"]{--font:"Atkinson Hyperlegible",system-ui,sans-serif;--contour:rgba(63,107,58,.08);
+  --bg:#eef0e8;--card:#fafbf6;--ink:#1e2a22;--muted:#566257;--line:#d5dacb;--accent:#3f6b3a;--accent-ink:#ffffff;
+  --soft:#f3f5ee;--danger:#a3271d;--shadow:none}
+@media (prefers-color-scheme: dark){
+  html[data-theme="contour"]{--contour:rgba(159,209,143,.06);--bg:#121814;--card:#1a221c;--ink:#e3eadf;--muted:#9fae9f;--line:#2b362e;
+    --accent:#9fd18f;--accent-ink:#12230f;--soft:#161d18;--danger:#f2b8b5}
+}
+html[data-theme="contour"] body{background-image:repeating-radial-gradient(ellipse at 10% 6%,transparent 0 34px,var(--contour) 34px 35px),
+  repeating-radial-gradient(ellipse at 92% 74%,transparent 0 42px,var(--contour) 42px 43px)}
+html[data-theme="contour"] h2{color:var(--accent);font-weight:700;letter-spacing:.12em}
+html[data-theme="contour"] h2::before{content:"◎\FE0E";margin-right:8px}
+html[data-theme="contour"] .q,html[data-theme="contour"] .top-btn{border-radius:10px}
+html[data-theme="contour"] .q i{border-radius:7px}
+html[data-theme="contour"] .fav:not(.paste-box){padding-left:calc(var(--fav-pad-x) + 34px)}
+html[data-theme="contour"] .fav:not(.paste-box)::before{content:attr(data-initial);position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  box-sizing:border-box;width:min(28px,var(--fav-h));height:min(28px,var(--fav-h));display:grid;place-items:center;border-radius:9px;
+  border:1.5px solid var(--fedge,var(--line));background:color-mix(in srgb,var(--fedge,var(--card)) 22%,var(--card));
+  color:var(--ink);font-weight:700;font-size:.78rem;letter-spacing:0}
+html[data-theme="contour"] .fav[data-color]{box-shadow:none}
+html[data-theme="contour"] #paperGrid .fav:not(.paste-box)::before{font-size:.6rem}
+html[data-theme="contour"] .tabs{border-bottom:0;gap:6px}
+html[data-theme="contour"] .tab{border:1px solid var(--line);border-radius:10px;margin:0;background:var(--card);color:var(--ink)}
+html[data-theme="contour"] .tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+html[data-theme="contour"] .tab[aria-selected="true"] .n{color:var(--accent-ink)}
+html[data-theme="contour"] .feed{border-radius:16px}
+html[data-theme="contour"] .feed li{line-height:1.5}
 </style>
+<script>
+// Theme (R047), per device: applied here, before the page draws, so a themed
+// page never flashes Today's look first. Fonts come from Google Fonts only
+// while a theme that uses them is on (Seebo 2026-10-29); no theme loads none.
+var THEME_FONTS = {
+  broadsheet:  "Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&family=Source+Sans+3:wght@400;600;700",
+  observatory: "Manrope:wght@400;500;600;700",
+  mineral:     "Figtree:wght@400;500;600;700",
+  catalogue:   "IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500",
+  contour:     "Atkinson+Hyperlegible:wght@400;700"
+};
+function setTheme(name){
+  var root = document.documentElement, link = document.getElementById("themeFont");
+  if (!THEME_FONTS.hasOwnProperty(name)) name = "";
+  if (name) root.setAttribute("data-theme", name); else root.removeAttribute("data-theme");
+  if (!name) { if (link) link.remove(); return name; }
+  if (!link) { link = document.createElement("link"); link.id = "themeFont"; link.rel = "stylesheet"; document.head.appendChild(link); }
+  link.href = "https://fonts.googleapis.com/css2?family=" + THEME_FONTS[name] + "&display=swap";
+  return name;
+}
+var currentTheme = (function(){ try { return setTheme(localStorage.getItem("homepage-theme") || ""); } catch (e) { return ""; } })();
+</script>
 </head>
 <body>
 <main>
@@ -442,6 +637,17 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
       <label class="radio"><input type="radio" name="favLayout" value="groups"> By group — a row for each group, in the order below</label>
     </fieldset>
     <fieldset>
+      <legend>Theme <span class="opt">— colours, fonts and shapes, on this device only</span></legend>
+      <select id="themePick" aria-label="Theme">
+        <option value="">Today (as it was)</option>
+        <option value="broadsheet">Broadsheet — newsprint, light or dark</option>
+        <option value="observatory">Observatory — night sky, always dark</option>
+        <option value="mineral">Mineral — stone, light or dark</option>
+        <option value="catalogue">Catalogue — index cards, always light</option>
+        <option value="contour">Contour — topographic, light or dark</option>
+      </select>
+    </fieldset>
+    <fieldset>
       <legend>Buttons <span class="opt">— favorites, research and videos, on this device only</span></legend>
       <div class="size-pick">
         <label>Per row
@@ -458,9 +664,11 @@ dialog .grp-line input{flex:1;width:auto;min-width:0;padding:6px 8px}
           </select></label>
         <label>Corners
           <select id="favShape">
+            <option value="">Theme's default</option>
             <option value="none">None (square)</option><option value="xs">Extra small</option><option value="sm">Small</option>
             <option value="md">Medium</option><option value="lg">Large</option><option value="xl">Extra large</option>
             <option value="full">Full (pill)</option>
+            <option value="cut">Cut corners</option><option value="ruled">Ruled — no box</option>
           </select></label>
       </div>
     </fieldset>
@@ -583,12 +791,18 @@ function renderQuick(){
   }).join("");
 }
 
+// The letter on a button's badge in the Contour theme (R047): its group's
+// first letter, or its own name's when it has no group. Unused elsewhere.
+function initialOf(g, name){
+  var s = ((g ? g.name : name) || "").trim();
+  return s ? ' data-initial="' + esc(Array.from(s)[0].toUpperCase()) + '"' : '';
+}
 function favTile(f){
   // The short name, if set, is what the button shows; the full name on hover (R015).
   // The colour is the group's (R023); a favorite's own old `color` is no longer used.
   var g = groupOf(f, "fav");
   var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
-  return '<a class="fav"' + colour + ' data-drag="fav" data-id="' + f.id + '" href="' + esc(f.url) + '" title="' + esc(f.title) + '">' +
+  return '<a class="fav"' + colour + initialOf(g, f.short || f.title) + ' data-drag="fav" data-id="' + f.id + '" href="' + esc(f.url) + '" title="' + esc(f.title) + '">' +
     '<b>' + esc(f.short || f.title) + '</b><small class="addr">' + esc(host(f.url)) + '</small>' +
     '<small class="grp' + (g ? '' : ' none') + '">' + esc(g ? g.name : "No group") + '</small>' +
     '<span class="tools">' +
@@ -622,7 +836,7 @@ function zoneHtml(k, tile){
 function paperTile(p){
   var g = groupOf(p, "paper");
   var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
-  return '<a class="fav"' + colour + ' data-drag="paper" data-id="' + p.id + '" href="?paper=' + p.id + '" title="' + esc(p.title) + '">' +
+  return '<a class="fav"' + colour + ' data-initial="PDF" data-drag="paper" data-id="' + p.id + '" href="?paper=' + p.id + '" title="' + esc(p.title) + '">' +
     '<b>' + esc(p.short || p.title) + '</b><small class="addr">PDF · ' + esc(sizeText(p.size)) + '</small>' +
     '<small class="grp' + (g ? '' : ' none') + '">' + esc(g ? g.name : "No group") + '</small>' +
     '<span class="tools">' +
@@ -643,7 +857,7 @@ function renderPapers(){
 function videoTile(v){
   var g = groupOf(v, "video");
   var colour = g && COLORS.indexOf(g.color) >= 0 ? ' data-color="' + g.color + '"' : '';
-  return '<a class="fav"' + colour + ' data-drag="video" data-id="' + v.id + '" href="' + esc(v.url) + '" title="' + esc(v.title) + '">' +
+  return '<a class="fav"' + colour + initialOf(g, v.short || v.title) + ' data-drag="video" data-id="' + v.id + '" href="' + esc(v.url) + '" title="' + esc(v.title) + '">' +
     '<b>' + esc(v.short || v.title) + '</b><small class="addr">' + esc(host(v.url)) + '</small>' +
     '<small class="grp' + (g ? '' : ' none') + '">' + esc(g ? g.name : "No group") + '</small>' +
     '<span class="tools">' +
@@ -1401,10 +1615,14 @@ function deleteGroup(k, g){
 // it was: as many per row as fit, Normal height, Medium corners. Storage that
 // fails or holds anything else is read as unset.
 // Per row: "", 6-10, or "fit" (each button as wide as its name, R040).
-// Corners: Material Design 3's shape scale, by its own names (R040).
+// Corners: Material Design 3's shape scale, by its own names (R040), plus
+// "cut" and "ruled" (R047). Unset = the theme's default, which the setting
+// overrides (Seebo 2026-10-29); Today's default is Medium, as it always was.
 var PER_ROW_KEY = "homepage-fav-per-row", SIZE_KEY = "homepage-fav-size", SHAPE_KEY = "homepage-fav-shape";
-var SHAPES = ["none", "xs", "sm", "md", "lg", "xl", "full"];
-var favPerRow = "", favSize = "3", favShape = "md";
+var THEME_KEY = "homepage-theme";
+var SHAPES = ["none", "xs", "sm", "md", "lg", "xl", "full", "cut", "ruled"];
+var THEME_SHAPE = {broadsheet: "ruled", observatory: "full", mineral: "cut", catalogue: "xs", contour: "lg"};
+var favPerRow = "", favSize = "3", favShape = "";
 function readLocal(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
 function writeLocal(k, v){ try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} }
 (function(){
@@ -1418,7 +1636,7 @@ function applyFavSize(){
   ["favGrid", "paperGrid", "videoGrid"].forEach(function(id){
     var g = $(id);
     g.dataset.size = favSize;
-    g.dataset.shape = favShape;
+    g.dataset.shape = favShape || THEME_SHAPE[currentTheme] || "md";
     if (favPerRow) g.dataset.perRow = favPerRow; else delete g.dataset.perRow;
     if (/^\d+$/.test(favPerRow)) g.style.setProperty("--per-row", favPerRow); else g.style.removeProperty("--per-row");
   });
@@ -1452,6 +1670,7 @@ function openSettings(){
   $("favPerRow").value = favPerRow;
   $("favSize").value = favSize;
   $("favShape").value = favShape;
+  $("themePick").value = currentTheme;
   renderGroupList("fav");
   renderGroupList("paper");
   renderGroupList("video");
@@ -1478,7 +1697,11 @@ $("setForm").addEventListener("change", function(e){
     applyFavSize();
   } else if (e.target.id === "favShape") {          // R040
     favShape = e.target.value;
-    writeLocal(SHAPE_KEY, favShape === "md" ? "" : favShape);
+    writeLocal(SHAPE_KEY, favShape);
+    applyFavSize();
+  } else if (e.target.id === "themePick") {         // R047: this browser only
+    currentTheme = setTheme(e.target.value);
+    writeLocal(THEME_KEY, currentTheme);
     applyFavSize();
   }
 });
