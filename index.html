@@ -58,13 +58,13 @@ body{margin:0;background:var(--bg);color:var(--ink);
 main{max-width:1200px;margin:0 auto;padding:16px 16px 48px}
 a{color:inherit}
 button{font:inherit;color:inherit}
-h2{font-size:.8rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+h2{font-size:var(--head-font,.8rem);font-weight:600;letter-spacing:.06em;text-transform:uppercase;
   color:var(--muted);margin:0}
 
 /* ---- top: quick-launch row + Edit switch ------------------------------ */
 .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-/* The quick row keeps at least 260px: with Add, Settings and Edit beside it
-   (about 300px), a phone wraps the buttons onto their own line instead of
+/* The quick row keeps at least 260px: with Settings and Edit beside it, a
+   phone wraps the buttons onto their own line instead of
    squeezing the quick row to one pill per line (seen at 375px, 2026-09-27). */
 .quick{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 260px;min-width:0}
 .q{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 6px;
@@ -86,7 +86,11 @@ body.editing .sec-move{display:inline-flex;gap:4px}
 @media (pointer:coarse){ .sec-move .icon-btn{width:36px;height:36px;font-size:1rem} }
 
 /* ---- favorites -------------------------------------------------------- */
-.sec-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 8px}
+.sec-head{--head-font:.9rem;--add-font:min(calc(var(--head-font) - 1pt),1rem);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:34px;margin:6px 0 8px}
+/* The way to add sits beside its heading, 1pt smaller than it (Seebo,
+   2026-11-02); capped at 1rem for Broadsheet's large headings. */
+.sec-add{font-size:var(--add-font);padding:3px 12px}
 /* Button size and shape (R039, R040), kept in this browser only: one of five
    heights (3 is the page as it was); at most N per row -- fewer on a narrow
    screen, never under 100px wide -- or each button as wide as its name; and
@@ -153,15 +157,16 @@ body.editing .fav small.addr{display:none}
    arranged by group. */
 #paperGrid:empty{display:none}
 dialog input[type="file"]{padding:6px;background:var(--card)}
-/* Videos (R045): the first "button" is a box to paste a link into. */
+/* Videos (R045): a box beside the heading to paste a link into. */
 #videoZones{display:contents}
-.fav.paste-box{border-style:dashed;background:transparent;color:var(--ink);font:inherit;font-size:var(--fav-font);
-  width:100%;min-height:var(--fav-h);box-shadow:none}
-.fav.paste-box::placeholder{color:var(--muted)}
-#videoPaste .paste-box{grid-column:span 2}           /* room for the hint and a pasted address */
-.fav.paste-box:focus{border-style:solid}
-.fav.paste-box:disabled{opacity:.6}
-@media (pointer:coarse){ .fav.paste-box{font-size:max(16px,var(--fav-font))} }  /* under 16px, iPhone zooms in on focus */
+#videoPaste{display:flex;flex:0 1 260px;min-width:0}
+.paste-box{border:1px dashed var(--line);border-radius:999px;background:transparent;color:var(--ink);font:inherit;
+  font-size:var(--add-font);padding:3px 12px;width:100%;min-width:0;box-shadow:none}
+.paste-box::placeholder{color:var(--muted)}
+.paste-box:hover,.paste-box:focus-visible{border-color:var(--accent);outline:none}
+.paste-box:focus{border-style:solid}
+.paste-box:disabled{opacity:.6}
+@media (pointer:coarse){ .paste-box{font-size:max(16px,var(--add-font))} }  /* under 16px, iPhone zooms in on focus */
 
 /* ---- feeds ------------------------------------------------------------ */
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -334,7 +339,7 @@ html[data-theme] .fav[data-color]{--fbg:color-mix(in srgb,var(--fedge) 16%,var(-
   html[data-theme] .tab{flex:none;white-space:nowrap}
 }
 @media (pointer:coarse){
-  html[data-theme] .q,html[data-theme] .top-btn,html[data-theme] .tab{min-height:44px}
+  html[data-theme] .q,html[data-theme] .top-btn,html[data-theme] .tab,html[data-theme] .paste-box{min-height:44px}
   html[data-theme] .q{padding-top:0;padding-bottom:0}
 }
 
@@ -348,8 +353,8 @@ html[data-theme="broadsheet"]{--font:"Source Sans 3",system-ui,sans-serif;--seri
 }
 html[data-theme="broadsheet"] .q,html[data-theme="broadsheet"] .top-btn{border-radius:2px}
 html[data-theme="broadsheet"] .q i{border-radius:1px;font-family:var(--serif)}
-html[data-theme="broadsheet"] .sec-head{border-top:3px double var(--ink);padding-top:6px}
-html[data-theme="broadsheet"] h2{font:italic 500 1.45rem/1.2 var(--serif);letter-spacing:0;text-transform:none;color:var(--ink)}
+html[data-theme="broadsheet"] .sec-head{--head-font:1.45rem;border-top:3px double var(--ink);padding-top:6px}
+html[data-theme="broadsheet"] h2{font:italic 500 var(--head-font,1.45rem)/1.2 var(--serif);letter-spacing:0;text-transform:none;color:var(--ink)}
 html[data-theme="broadsheet"] .tabs{gap:2px 18px}
 html[data-theme="broadsheet"] .tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 0 8px;
   font-weight:700;font-size:.78rem;letter-spacing:.09em;text-transform:uppercase}
@@ -375,7 +380,7 @@ html[data-theme="observatory"] [data-color="teal"]{--fedge:#72cdc2}
 html[data-theme="observatory"] [data-color="blue"]{--fedge:#8ab4f8}
 html[data-theme="observatory"] [data-color="purple"]{--fedge:#c3a4f2}
 html[data-theme="observatory"] [data-color="pink"]{--fedge:#f48fb1}
-html[data-theme="observatory"] h2{font-weight:700;font-size:.78rem;letter-spacing:.14em}
+html[data-theme="observatory"] h2{font-weight:700;font-size:var(--head-font,.78rem);letter-spacing:.14em}
 html[data-theme="observatory"] h2::before{content:"✦\FE0E";color:var(--accent);margin-right:8px}
 html[data-theme="observatory"] .sec-head::after{content:"";flex:1 1 40px;height:1px;background:var(--line)}
 html[data-theme="observatory"] .fav[data-color]{background:var(--card);box-shadow:none;padding-left:calc(var(--fav-pad-x) + 16px)}
@@ -435,7 +440,7 @@ html[data-theme="catalogue"] .fav small,html[data-theme="catalogue"] .tab .n{fon
 html[data-theme="catalogue"] .q i{font-family:var(--mono);border-radius:2px}
 html[data-theme="catalogue"] .q,html[data-theme="catalogue"] .top-btn{border-radius:3px}
 html[data-theme="catalogue"] h2{display:inline-block;padding:5px 12px;border:1.5px solid var(--ink);border-radius:2px;background:var(--card);
-  font:500 .75rem/1 var(--mono);letter-spacing:.14em;color:var(--ink)}
+  font:500 var(--head-font,.75rem)/1 var(--mono);letter-spacing:.14em;color:var(--ink)}
 html[data-theme="catalogue"] .sec-head::after{content:"";flex:1 1 40px;height:1px;background:var(--line)}
 html[data-theme="catalogue"] .tab{background:var(--soft);color:var(--ink);border-radius:8px 8px 0 0}
 html[data-theme="catalogue"] .tab[aria-selected="true"]{background:var(--card)}
@@ -498,11 +503,9 @@ var currentTheme = (function(){ try { return setTheme(localStorage.getItem("home
 <main>
   <header class="top">
     <nav class="quick" aria-label="Quick launch" id="quick"></nav>
-    <!-- Add and Settings sit beside Edit (Seebo, 2026-09-27, at R025's check),
-         so the favorite rows start clean at the left. -->
+    <!-- Settings sits beside Edit; each Add moved beside its section's heading
+         (Seebo, 2026-11-02). -->
     <span class="top-actions">
-      <button class="top-btn" id="addBtn" data-action="add-fav" hidden>+ Add favorite</button>
-      <button class="top-btn" id="addPaperBtn" data-action="add-paper" hidden>+ Add research</button>
       <button class="top-btn" id="setBtn" data-action="settings" hidden>⚙&#xFE0E; Settings</button>
       <button class="top-btn edit-toggle" id="editBtn" aria-pressed="false" hidden>Edit</button>
     </span>
@@ -527,25 +530,21 @@ var currentTheme = (function(){ try { return setTheme(localStorage.getItem("home
 
   <div id="mine" hidden>
   <section aria-labelledby="favH" data-sec="fav">
-    <div class="sec-head"><h2 id="favH">Favorites</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Favorites up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Favorites down">↓</button></span><span class="feed-state" id="favStatus" role="status"></span></div>
+    <div class="sec-head"><h2 id="favH">Favorites</h2><button class="top-btn sec-add" id="addBtn" data-action="add-fav" hidden>+ Add favorite</button><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Favorites up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Favorites down">↓</button></span><span class="feed-state" id="favStatus" role="status"></span></div>
     <div class="fav-grid" id="favGrid" data-zone="fav"></div>
   </section>
 
   <!-- Research (R042): under the favorites, in its own groups. -->
   <section aria-labelledby="paperH" data-sec="paper">
-    <div class="sec-head"><h2 id="paperH">Research</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Research up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Research down">↓</button></span><span class="feed-state" id="paperStatus" role="status"></span></div>
+    <div class="sec-head"><h2 id="paperH">Research</h2><button class="top-btn sec-add" id="addPaperBtn" data-action="add-paper" hidden>+ Add research</button><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Research up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Research down">↓</button></span><span class="feed-state" id="paperStatus" role="status"></span></div>
     <div class="fav-grid by-group" id="paperGrid" data-zone="paper"></div>
-    <p class="note" id="paperEmpty" hidden>No papers yet — add a PDF with + Add research at the top.</p>
+    <p class="note" id="paperEmpty" hidden>No papers yet — add a PDF with + Add research above.</p>
   </section>
 
   <!-- Videos (R045): under Research. The paste box is the way to add. -->
   <section aria-labelledby="videoH" data-sec="video">
-    <div class="sec-head"><h2 id="videoH">Videos</h2><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Videos up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Videos down">↓</button></span><span class="feed-state" id="videoStatus" role="status"></span></div>
+    <div class="sec-head"><h2 id="videoH">Videos</h2><form id="videoPaste" autocomplete="off"><input class="paste-box" id="videoUrl" type="text" inputmode="url" enterkeyhint="go" spellcheck="false" placeholder="Paste a link, press Enter" aria-label="Paste a video link, then press Enter"></form><span class="edit-only sec-move"><button type="button" class="icon-btn" data-move="up" aria-label="Move Videos up">↑</button><button type="button" class="icon-btn" data-move="down" aria-label="Move Videos down">↓</button></span><span class="feed-state" id="videoStatus" role="status"></span></div>
     <div class="fav-grid by-group" id="videoGrid" data-zone="video">
-      <form class="fav-row" id="videoPaste" autocomplete="off">
-        <input class="fav paste-box" id="videoUrl" type="text" inputmode="url" enterkeyhint="go" spellcheck="false"
-               placeholder="Paste a link, press Enter" aria-label="Paste a video link, then press Enter">
-      </form>
       <div id="videoZones"></div>
     </div>
   </section>
